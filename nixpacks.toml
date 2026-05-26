@@ -1,0 +1,14 @@
+# Nixpacks 自訂配置 — 跳過 Nixpacks 預設的 corepack 流程。
+#
+# 問題:Nixpacks 預設會跑 `npm install -g corepack@0.24.1 && corepack enable`,
+# 然後 corepack 從 package.json 的 packageManager 欄位拉 pnpm@11.3.0。
+# 但 corepack 0.24.1 在 Node 22+ 載入 pnpm 11.x 的 ESM 入口時會 crash:
+#   TypeError [ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING]
+#
+# 解法:直接用 npm 全域裝 pnpm,完全避開 corepack。
+
+[phases.install]
+cmds = [
+  'npm install -g pnpm@11.3.0',
+  'pnpm install --frozen-lockfile'
+]
