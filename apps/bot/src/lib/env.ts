@@ -1,5 +1,12 @@
-import 'dotenv/config';
+import { config as dotenvConfig } from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
 import { z } from 'zod';
+
+// .env 放在 monorepo 根目錄,但 tsx 從 apps/bot/ 啟動,cwd 不對
+// 明確指定路徑:apps/bot/src/lib/env.ts → ../../../.. = monorepo root
+const __dirname = dirname(fileURLToPath(import.meta.url));
+dotenvConfig({ path: resolve(__dirname, '../../../..', '.env') });
 
 /**
  * 環境變數的型別與驗證

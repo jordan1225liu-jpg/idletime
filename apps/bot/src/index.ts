@@ -54,7 +54,7 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds],
 });
 
-client.once('ready', (readyClient) => {
+client.once('clientReady', (readyClient) => {
   console.log(`🤖 已登入 Discord:${readyClient.user.tag}`);
   console.log(`📍 加入 ${readyClient.guilds.cache.size} 個伺服器`);
 });
