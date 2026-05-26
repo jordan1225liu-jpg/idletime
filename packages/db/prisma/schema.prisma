@@ -39,17 +39,18 @@ model User {
 
 /// 角色屬性 (1-1 with User in MVP);未來可改成 1-N 多角色
 model Character {
-  userId              String   @id @map("user_id")
+  userId              String    @id @map("user_id")
   name                String
-  level               Int      @default(1)
-  exp                 Int      @default(0)
-  gold                Int      @default(100)
-  energy              Int      @default(50)
-  energyMax           Int      @default(100) @map("energy_max")
-  energyLastSettledAt DateTime @default(now()) @map("energy_last_settled_at")
-  activeGuildId       String?  @map("active_guild_id")
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
+  level               Int       @default(1)
+  exp                 Int       @default(0)
+  gold                Int       @default(100)
+  energy              Int       @default(50)
+  energyMax           Int       @default(100) @map("energy_max")
+  energyLastSettledAt DateTime  @default(now()) @map("energy_last_settled_at")
+  lastFishingAt       DateTime? @map("last_fishing_at") // /fish 1-minute CD tracking
+  activeGuildId       String?   @map("active_guild_id")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
 
   user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   activeGuild Guild? @relation(fields: [activeGuildId], references: [id], onDelete: SetNull)

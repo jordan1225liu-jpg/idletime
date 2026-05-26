@@ -1,4 +1,5 @@
 import type {
+  AutocompleteInteraction,
   ButtonInteraction,
   ChatInputCommandInteraction,
   ModalSubmitInteraction,
@@ -11,6 +12,9 @@ import * as start from './start.js';
 import * as me from './me.js';
 import * as farm from './farm.js';
 import * as visit from './visit.js';
+import * as inventory from './inventory.js';
+import * as sell from './sell.js';
+import * as fish from './fish.js';
 
 export interface Command {
   /** Slash command 定義(會被序列化送給 Discord 註冊)*/
@@ -23,6 +27,8 @@ export interface Command {
   handleButton?: (interaction: ButtonInteraction) => Promise<boolean>;
   /** (可選)處理 string select menu;回傳 true 表示已處理 */
   handleSelectMenu?: (interaction: StringSelectMenuInteraction) => Promise<boolean>;
+  /** (可選)處理 autocomplete;回傳 true 表示已處理 */
+  handleAutocomplete?: (interaction: AutocompleteInteraction) => Promise<boolean>;
 }
 
 export const commands: readonly Command[] = [
@@ -31,4 +37,7 @@ export const commands: readonly Command[] = [
   me as Command,
   farm as Command,
   visit as Command,
+  inventory as Command,
+  sell as Command,
+  fish as Command,
 ];

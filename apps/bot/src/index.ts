@@ -150,6 +150,19 @@ client.on('interactionCreate', async (interaction) => {
       console.warn(`⚠️ 沒有 handler 處理 select menu: ${interaction.customId}`);
       return;
     }
+
+    if (interaction.isAutocomplete()) {
+      // Autocomplete 只給對應 commandName 的 command
+      for (const cmd of commands) {
+        if (!cmd.handleAutocomplete) continue;
+        if (interaction.commandName !== cmd.data.name) continue;
+        const handled = await cmd.handleAutocomplete(interaction);
+        if (handled) return;
+      }
+      // 沒人處理就回空清單(避免 Discord 顯示「正在搜尋...」永久)
+      await interaction.respond([]);
+      return;
+    }
   } catch (error) {
     console.error('❌ interaction 處理失敗:', error);
     const errorReply = {
