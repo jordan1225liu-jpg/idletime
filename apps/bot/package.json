@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@idletime/db": "workspace:*",
     "discord.js": "^14.16.3",
     "dotenv": "^16.4.5",
     "zod": "^3.23.8"

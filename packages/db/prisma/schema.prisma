@@ -1,0 +1,209 @@
+// idletime DB schema v0.1
+// Convention: camelCase in Prisma, snake_case in PostgreSQL via @map
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// USERS & CHARACTERS
+// ═══════════════════════════════════════════════════════════════
+
+/// 玩家本體,主鍵 = Discord User ID (snowflake)
+model User {
+  id              String   @id // Discord User ID
+  discordUsername String   @map("discord_username")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  character        Character?
+  inventory        InventoryItem[]
+  farm             Farm?
+  farmPlots        FarmPlot[]
+  skills           PlayerSkill[]
+  guildMemberships GuildMembership[]
+
+  friendshipsAsA Friendship[] @relation("FriendshipUserA")
+  friendshipsAsB Friendship[] @relation("FriendshipUserB")
+  visitsGiven    DailyVisit[] @relation("VisitsGiven")
+  visitsReceived DailyVisit[] @relation("VisitsReceived")
+
+  @@map("users")
+}
+
+/// 角色屬性 (1-1 with User in MVP);未來可改成 1-N 多角色
+model Character {
+  userId              String   @id @map("user_id")
+  name                String
+  level               Int      @default(1)
+  exp                 Int      @default(0)
+  gold                Int      @default(100)
+  energy              Int      @default(50)
+  energyMax           Int      @default(100) @map("energy_max")
+  energyLastSettledAt DateTime @default(now()) @map("energy_last_settled_at")
+  activeGuildId       String?  @map("active_guild_id")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeGuild Guild? @relation(fields: [activeGuildId], references: [id], onDelete: SetNull)
+
+  @@index([activeGuildId])
+  @@map("characters")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GUILDS (= Discord Servers)
+// ═══════════════════════════════════════════════════════════════
+
+/// Discord 伺服器 = 遊戲公會
+model Guild {
+  id        String   @id // Discord Guild ID
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  memberships GuildMembership[]
+  activeFor   Character[]
+
+  @@map("guilds")
+}
+
+/// 玩家在哪些公會 (Discord 伺服)
+model GuildMembership {
+  userId   String   @map("user_id")
+  guildId  String   @map("guild_id")
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@id([userId, guildId])
+  @@index([guildId])
+  @@map("guild_memberships")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ITEMS & INVENTORY
+// ═══════════════════════════════════════════════════════════════
+
+/// 道具型錄 (catalog),由 seed 寫入
+model Item {
+  id          String  @id // e.g. "wheat_seed", "wheat", "carrot"
+  name        String
+  category    String // "seed", "crop", "food", "material", "tool", "consumable"
+  description String?
+  emoji       String?
+  sellPrice   Int     @default(0) @map("sell_price") // 賣給 NPC 商人的價格(0 = 不可賣)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  inventories InventoryItem[]
+
+  @@index([category])
+  @@map("items")
+}
+
+/// 玩家背包 (user × item × quantity)
+model InventoryItem {
+  userId    String   @map("user_id")
+  itemId    String   @map("item_id")
+  quantity  Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item Item @relation(fields: [itemId], references: [id])
+
+  @@id([userId, itemId])
+  @@index([userId])
+  @@map("inventory_items")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FARM (MVP first life skill)
+// ═══════════════════════════════════════════════════════════════
+
+/// 玩家農場本體
+model Farm {
+  userId    String   @id @map("user_id")
+  plotCount Int      @default(5) @map("plot_count")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("farms")
+}
+
+/// 個別田地;狀態:空 (cropType=null) / 生長中 (有 plantedAt)
+model FarmPlot {
+  id        Int       @id @default(autoincrement())
+  userId    String    @map("user_id")
+  plotIndex Int       @map("plot_index") // 0-based position
+  cropType  String?   @map("crop_type") // 對應 Item.id (種子變成的作物 id)
+  plantedAt DateTime? @map("planted_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, plotIndex])
+  @@index([userId])
+  @@map("farm_plots")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FRIENDSHIPS & SOCIAL
+// ═══════════════════════════════════════════════════════════════
+
+/// 好友關係。Convention: userIdA < userIdB (lexicographic) 確保唯一性
+model Friendship {
+  userIdA   String   @map("user_id_a")
+  userIdB   String   @map("user_id_b")
+  status    String   @default("accepted") // "pending", "accepted", "blocked"
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userA User @relation("FriendshipUserA", fields: [userIdA], references: [id], onDelete: Cascade)
+  userB User @relation("FriendshipUserB", fields: [userIdB], references: [id], onDelete: Cascade)
+
+  @@id([userIdA, userIdB])
+  @@index([userIdB]) // 反向查找 (找誰加我好友)
+  @@map("friendships")
+}
+
+/// 每日拜訪紀錄,用來防刷 + 計算當日 buff
+model DailyVisit {
+  visitorId String   @map("visitor_id")
+  visitedId String   @map("visited_id")
+  visitDate DateTime @map("visit_date") @db.Date
+  createdAt DateTime @default(now()) @map("created_at")
+
+  visitor User @relation("VisitsGiven", fields: [visitorId], references: [id], onDelete: Cascade)
+  visited User @relation("VisitsReceived", fields: [visitedId], references: [id], onDelete: Cascade)
+
+  @@id([visitorId, visitedId, visitDate])
+  @@index([visitorId, visitDate]) // 查詢 "我今天拜訪過幾個人"
+  @@map("daily_visits")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LIFE SKILLS
+// ═══════════════════════════════════════════════════════════════
+
+/// 玩家各項生活技能等級
+/// skillId: "farming", "fishing", "gathering", "cooking", "smithing", "tailoring", "brewing", "shopkeep"
+model PlayerSkill {
+  userId    String   @map("user_id")
+  skillId   String   @map("skill_id")
+  level     Int      @default(1)
+  exp       Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, skillId])
+  @@index([userId])
+  @@map("player_skills")
+}

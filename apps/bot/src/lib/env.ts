@@ -17,6 +17,11 @@ const envSchema = z.object({
   DISCORD_APPLICATION_ID: z.string().min(1, 'DISCORD_APPLICATION_ID is required'),
   DISCORD_DEV_GUILD_ID: z.string().optional(),
   DISCORD_OWNER_ID: z.string().optional(),
+  // DB
+  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  // Redis (MVP 尚未使用,先收進來但設為 optional)
+  UPSTASH_REDIS_REST_URL: z.string().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });
 
