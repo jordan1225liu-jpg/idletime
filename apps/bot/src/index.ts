@@ -130,6 +130,16 @@ client.on('interactionCreate', async (interaction) => {
       console.warn(`⚠️ 沒有 handler 處理 modal: ${interaction.customId}`);
       return;
     }
+
+    if (interaction.isButton()) {
+      for (const cmd of commands) {
+        if (!cmd.handleButton) continue;
+        const handled = await cmd.handleButton(interaction);
+        if (handled) return;
+      }
+      console.warn(`⚠️ 沒有 handler 處理 button: ${interaction.customId}`);
+      return;
+    }
   } catch (error) {
     console.error('❌ interaction 處理失敗:', error);
     const errorReply = {

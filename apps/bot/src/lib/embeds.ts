@@ -1,6 +1,8 @@
 import { EmbedBuilder } from 'discord.js';
 import { expForNextLevel, levelProgress } from './leveling.js';
 import { formatEnergyStatus } from './energy.js';
+import { CROPS } from './crops.js';
+import type { PlotState } from './farm.js';
 import type { CharacterWithGuild } from './character.js';
 
 /** 主題色,跟 GDD §8.2 一致 */
@@ -90,4 +92,59 @@ export function buildWelcomeEmbed(characterName: string): EmbedBuilder {
 /** 通用錯誤 embed */
 export function buildErrorEmbed(message: string): EmbedBuilder {
   return new EmbedBuilder().setColor(COLORS.RED).setDescription(`⚠️ ${message}`);
+}
+
+/** /farm 主面板 embed */
+export function buildFarmEmbed(params: {
+  character: CharacterWithGuild;
+  farmingSkill: { level: number; exp: number };
+  plots: PlotState[];
+  notification?: string;
+}): EmbedBuilder {
+  const { character, farmingSkill, plots, notification } = params;
+
+  // 田地行
+  const plotLines = plots.map((plot, i) => {
+    const num = `${i + 1}.`;
+    if (plot.status === 'empty') return `${num} ⬜ 空田`;
+    if (plot.status === 'ready') {
+      return `${num} ${plot.crop!.emoji} **${plot.crop!.name}** ✨ 可收成`;
+    }
+    // growing
+    const bar = makeProgressBar(plot.progress ?? 0, 12);
+    const remaining = formatDuration(Math.ceil((plot.msUntilReady ?? 0) / 1000));
+    return `${num} ${plot.crop!.emoji} ${plot.crop!.name} ${bar} ${plot.progress}% (剩 ${remaining})`;
+  });
+
+  // 農場技能進度條
+  const xpNeeded = expForNextLevel(farmingSkill.level);
+  const xpProgress = Math.floor((farmingSkill.exp / xpNeeded) * 100);
+  const xpBar = makeProgressBar(xpProgress, 8);
+
+  // 可種作物清單
+  const cropOptions = Object.values(CROPS)
+    .map((c) => {
+      const locked = c.unlockLevel > farmingSkill.level;
+      const lockTag = locked ? ` 🔒 需 Lv ${c.unlockLevel}` : '';
+      return `${c.emoji} **${c.name}** — ${formatDuration(c.growSeconds)} / -${c.energyCost} 體力${lockTag}`;
+    })
+    .join('\n');
+
+  let description = `📍 ${character.activeGuild?.name ?? '(未知公會)'}`;
+  if (notification) description += `\n\n${notification}`;
+
+  return new EmbedBuilder()
+    .setColor(COLORS.GREEN)
+    .setTitle(`🌿 ${character.name} 的農場`)
+    .setDescription(description)
+    .addFields(
+      { name: '🌱 田地狀態', value: plotLines.join('\n'), inline: false },
+      { name: '❤️ 體力', value: formatEnergyStatus(character), inline: true },
+      {
+        name: '🎯 農場技能',
+        value: `**Lv ${farmingSkill.level}**\n${xpBar}\n${farmingSkill.exp} / ${xpNeeded} XP`,
+        inline: true,
+      },
+      { name: '🌾 可種作物', value: cropOptions, inline: false },
+    );
 }

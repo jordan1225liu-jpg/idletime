@@ -43,3 +43,33 @@ export function levelFromTotalExp(totalExp: number): { level: number; expInLevel
   }
   return { level, expInLevel: remaining };
 }
+
+/**
+ * 加 XP 到目前狀態,回傳新的 level + 該等級內 exp + 升了幾級。
+ * 這是「玩家做動作獲得 XP」的核心 helper(收成、打怪、烹飪等都會用)。
+ *
+ * 例:Lv 5 (35 XP) + 60 XP 收成 → 如果 expForNextLevel(5) = 60,則升 Lv 6 (35 XP 剩餘)。
+ */
+export function addExp(
+  currentLevel: number,
+  currentExp: number,
+  gain: number,
+): { level: number; exp: number; levelsGained: number } {
+  let level = currentLevel;
+  let exp = currentExp + gain;
+  let levelsGained = 0;
+
+  while (level < 100 && exp >= expForNextLevel(level)) {
+    exp -= expForNextLevel(level);
+    level += 1;
+    levelsGained += 1;
+  }
+
+  // 已封頂(Lv 100)的話 exp 不再累積,鎖在當級
+  if (level >= 100) {
+    level = 100;
+    exp = Math.min(exp, expForNextLevel(99)); // 不讓 exp 異常
+  }
+
+  return { level, exp, levelsGained };
+}
