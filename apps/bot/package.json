@@ -4,11 +4,10 @@
   "description": "idletime Discord bot",
   "private": true,
   "type": "module",
-  "main": "dist/index.js",
+  "main": "src/index.ts",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "tsx test/energy.test.ts && tsx test/crops.test.ts && tsx test/visit.test.ts"
   },
@@ -16,11 +15,11 @@
     "@idletime/db": "workspace:*",
     "discord.js": "^14.16.3",
     "dotenv": "^16.4.5",
+    "tsx": "^4.19.2",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
-    "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }
 }

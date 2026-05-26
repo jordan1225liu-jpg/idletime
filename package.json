@@ -6,9 +6,10 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @idletime/bot dev",
-    "build": "pnpm --filter @idletime/bot build",
+    "build": "pnpm --filter @idletime/db db:generate:prod",
     "start": "pnpm --filter @idletime/bot start",
-    "typecheck": "pnpm --filter @idletime/bot typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @idletime/bot test"
   },
   "engines": {
     "node": ">=20.0.0",
