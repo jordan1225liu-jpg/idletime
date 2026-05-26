@@ -1,0 +1,18 @@
+{
+  "name": "idletime",
+  "version": "0.0.1",
+  "description": "Cozy medieval cooperative slow-MMO Discord bot",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @idletime/bot dev",
+    "build": "pnpm --filter @idletime/bot build",
+    "start": "pnpm --filter @idletime/bot start",
+    "typecheck": "pnpm --filter @idletime/bot typecheck"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@11.3.0"
+}

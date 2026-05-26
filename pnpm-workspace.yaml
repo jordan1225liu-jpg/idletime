@@ -1,0 +1,8 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# pnpm 10+ 安全機制:明確允許 install scripts
+# esbuild 是 tsx 的相依,需要下載原生 binary
+allowBuilds:
+  esbuild: true
