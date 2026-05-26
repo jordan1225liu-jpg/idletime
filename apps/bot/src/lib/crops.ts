@@ -6,7 +6,8 @@
  * - 售價 ≈ floor(XP² × 4 ~ 6)→ 指數成長,長作物金幣回報補償時間
  * - 結果:玩家可依「我有多少時間」自主選擇短/長作物
  *
- * 體力消耗也隨等級緩步增加:Lv 1-5 都是 5,Lv 100 為 25(換算後對體力上限的負擔仍合理)
+ * 種田不消耗體力(體力留給未來戰鬥/組隊系統)。
+ * 自然限制:5 個田 + 各作物生長時間 → 不需要額外的體力 gate。
  */
 
 export interface Crop {
@@ -18,8 +19,6 @@ export interface Crop {
   name: string;
   /** 生長秒數 */
   growSeconds: number;
-  /** 種植消耗體力 */
-  energyCost: number;
   /** 解鎖此作物所需的農場技能等級 */
   unlockLevel: number;
   /** 收成獲得的農場技能 XP */
@@ -37,7 +36,6 @@ export const CROPS: Record<string, Crop> = {
     emoji: '🌾',
     name: '小麥',
     growSeconds: 15 * 60,
-    energyCost: 5,
     unlockLevel: 1,
     xpReward: 5,
     sellPrice: 2,
@@ -48,7 +46,6 @@ export const CROPS: Record<string, Crop> = {
     emoji: '🥕',
     name: '胡蘿蔔',
     growSeconds: 30 * 60,
-    energyCost: 5,
     unlockLevel: 3,
     xpReward: 8,
     sellPrice: 5,
@@ -59,7 +56,6 @@ export const CROPS: Record<string, Crop> = {
     emoji: '🥔',
     name: '馬鈴薯',
     growSeconds: 60 * 60,
-    energyCost: 5,
     unlockLevel: 5,
     xpReward: 12,
     sellPrice: 12,
@@ -70,7 +66,6 @@ export const CROPS: Record<string, Crop> = {
     emoji: '🍅',
     name: '番茄',
     growSeconds: 2 * HOUR,
-    energyCost: 6,
     unlockLevel: 8,
     xpReward: 16,
     sellPrice: 30,
@@ -81,7 +76,6 @@ export const CROPS: Record<string, Crop> = {
     emoji: '🌽',
     name: '玉米',
     growSeconds: 4 * HOUR,
-    energyCost: 6,
     unlockLevel: 12,
     xpReward: 25,
     sellPrice: 75,
@@ -92,7 +86,6 @@ export const CROPS: Record<string, Crop> = {
     emoji: '🎃',
     name: '南瓜',
     growSeconds: 6 * HOUR,
-    energyCost: 7,
     unlockLevel: 15,
     xpReward: 33,
     sellPrice: 130,
@@ -103,7 +96,6 @@ export const CROPS: Record<string, Crop> = {
     emoji: '🌶️',
     name: '辣椒',
     growSeconds: 8 * HOUR,
-    energyCost: 7,
     unlockLevel: 20,
     xpReward: 39,
     sellPrice: 200,
@@ -114,7 +106,6 @@ export const CROPS: Record<string, Crop> = {
     emoji: '🤍',
     name: '棉花',
     growSeconds: 12 * HOUR,
-    energyCost: 8,
     unlockLevel: 25,
     xpReward: 51,
     sellPrice: 350,
@@ -125,7 +116,6 @@ export const CROPS: Record<string, Crop> = {
     emoji: '🍓',
     name: '草莓',
     growSeconds: 16 * HOUR,
-    energyCost: 8,
     unlockLevel: 30,
     xpReward: 62,
     sellPrice: 550,
@@ -136,7 +126,6 @@ export const CROPS: Record<string, Crop> = {
     emoji: '🍇',
     name: '葡萄',
     growSeconds: 24 * HOUR,
-    energyCost: 10,
     unlockLevel: 40,
     xpReward: 80,
     sellPrice: 1000,
@@ -147,7 +136,6 @@ export const CROPS: Record<string, Crop> = {
     emoji: '🍉',
     name: '西瓜',
     growSeconds: 36 * HOUR,
-    energyCost: 10,
     unlockLevel: 50,
     xpReward: 105,
     sellPrice: 1800,
@@ -158,7 +146,6 @@ export const CROPS: Record<string, Crop> = {
     emoji: '🍵',
     name: '茶葉',
     growSeconds: 48 * HOUR,
-    energyCost: 12,
     unlockLevel: 60,
     xpReward: 125,
     sellPrice: 3000,
@@ -169,7 +156,6 @@ export const CROPS: Record<string, Crop> = {
     emoji: '🍎',
     name: '蘋果',
     growSeconds: 60 * HOUR,
-    energyCost: 12,
     unlockLevel: 70,
     xpReward: 144,
     sellPrice: 4800,
@@ -180,7 +166,6 @@ export const CROPS: Record<string, Crop> = {
     emoji: '🍷',
     name: '釀酒葡萄',
     growSeconds: 72 * HOUR,
-    energyCost: 15,
     unlockLevel: 80,
     xpReward: 161,
     sellPrice: 7500,
@@ -191,7 +176,6 @@ export const CROPS: Record<string, Crop> = {
     emoji: '🌿',
     name: '神祕藥草',
     growSeconds: 96 * HOUR,
-    energyCost: 18,
     unlockLevel: 90,
     xpReward: 195,
     sellPrice: 13000,
@@ -202,7 +186,6 @@ export const CROPS: Record<string, Crop> = {
     emoji: '🌟',
     name: '黃金小麥',
     growSeconds: 144 * HOUR,
-    energyCost: 25,
     unlockLevel: 100,
     xpReward: 254,
     sellPrice: 28000,

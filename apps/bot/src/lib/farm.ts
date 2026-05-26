@@ -1,6 +1,5 @@
 import { prisma } from '@idletime/db';
 import { CROPS, computeCropProgress, type Crop } from './crops.js';
-import { spendEnergy } from './energy.js';
 import { addExp } from './leveling.js';
 
 export interface PlotState {
@@ -99,16 +98,7 @@ export async function plantCrop(userId: string, cropId: string): Promise<PlantRe
     return { ok: false, reason: '沒有空田!請先收成' };
   }
 
-  // 3. 扣體力(內部已 settle)
-  const spend = await spendEnergy(userId, crop.energyCost);
-  if (!spend.ok) {
-    return {
-      ok: false,
-      reason: `體力不足:需要 ${crop.energyCost},目前 ${spend.current.energy}/${spend.current.energyMax}`,
-    };
-  }
-
-  // 4. 種下
+  // 3. 種下(種田不消耗體力,設計簡化)
   await prisma.farmPlot.upsert({
     where: { userId_plotIndex: { userId, plotIndex: emptyPlot.plotIndex } },
     create: {

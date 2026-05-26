@@ -57,9 +57,8 @@ async function buildFarmUI(userId: string, notification?: string) {
 
   if (unlocked.length > 0) {
     for (const crop of unlocked) {
-      const affordable = character.energy >= crop.energyCost;
       const label = `${crop.name} (${formatDurationShort(crop.growSeconds)})`;
-      const desc = `+${crop.xpReward} XP · 售 ${crop.sellPrice}💰 · -${crop.energyCost}⚡${affordable ? '' : ' ⚠️體力不足'}`;
+      const desc = `+${crop.xpReward} XP · 售 ${crop.sellPrice}💰`;
       selectMenu.addOptions(
         new StringSelectMenuOptionBuilder()
           .setLabel(label.slice(0, 100))

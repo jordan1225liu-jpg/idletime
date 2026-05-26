@@ -119,16 +119,6 @@ test('金幣/分鐘 嚴格遞增(長作物回報補償)', () => {
   }
 });
 
-test('體力消耗也漸增', () => {
-  const sorted = allCropsByLevel();
-  for (let i = 1; i < sorted.length; i++) {
-    assert.ok(
-      sorted[i]!.energyCost >= sorted[i - 1]!.energyCost,
-      `${sorted[i]!.id} 體力 (${sorted[i]!.energyCost}) 應 >= ${sorted[i - 1]!.id} (${sorted[i - 1]!.energyCost})`,
-    );
-  }
-});
-
 console.log('\n[unlockedCrops / nextLockedCrops]');
 
 test('Lv 1 → 只有小麥解鎖', () => {
