@@ -244,12 +244,13 @@ idletime 是一款透過 Discord bot 提供服務的多人線上社交遊戲。�
 
 ### 8.2 視覺風格
 
-- **Embed 主題色**:
-  - 主色 `#8B4513`(中世紀棕)
-  - 輔色 `#D4AF37`(古銅金)
-  - 點綴 `#3CB371`(草地綠)
-- **emoji 大量使用**,表達狀態與道具
-- **道具/角色/怪物縮圖**:用 AI 生成中世紀可愛風(Phase 2 整理),放圖床
+完整規範見 [`STYLE_GUIDE.md`](./STYLE_GUIDE.md)。重點摘要:
+
+- **5 色系統**:棕 PRIMARY / 金 GOLD / 綠 GREEN / 紅 RED / 藍 BLUE
+- **emoji 字典**:`apps/bot/src/lib/embeds.ts` 的 `EMOJI` 常數,所有系統用 emoji 統一從這拿
+- **作物 emoji** 各自定義在 `crops.ts`(資料 + 視覺綁一起)
+- **AI 生圖 prompt 模板**:見風格指南 §5,bot 頭像、banner、作物縮圖都有
+- **語氣**:用「你」不用「您」、emoji 點綴不堆疊、不用 meme
 
 ### 8.3 通知策略
 

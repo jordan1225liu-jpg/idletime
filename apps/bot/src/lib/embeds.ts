@@ -5,13 +5,50 @@ import { unlockedCrops, nextLockedCrops } from './crops.js';
 import type { PlotState } from './farm.js';
 import type { CharacterWithGuild } from './character.js';
 
-/** 主題色,跟 GDD §8.2 一致 */
+/**
+ * 主題色,跟 STYLE_GUIDE.md §1 一致。
+ * 修改前先看風格指南,確保跨 command 一致。
+ */
 export const COLORS = {
-  PRIMARY: 0x8b4513, // 中世紀棕
-  GOLD: 0xd4af37, // 古銅金
-  GREEN: 0x3cb371, // 草地綠
-  RED: 0xcc3333, // 警告紅
-  BLUE: 0x4682b4, // 資訊藍
+  PRIMARY: 0x8b4513, // 中世紀棕 — 角色面板、身分
+  GOLD: 0xd4af37, // 古銅金 — 邀請、歡迎、節慶
+  GREEN: 0x3cb371, // 草地綠 — 農場、成功
+  RED: 0xcc3333, // 警告紅 — 錯誤、拒絕
+  BLUE: 0x4682b4, // 資訊藍 — 純資訊(預留)
+} as const;
+
+/**
+ * 全遊戲共用的「系統 emoji 字典」。新增時務必同步 STYLE_GUIDE.md §2。
+ * 作物/怪物等資料相關的 emoji 不放這 —— 留在自己的 data 檔(如 crops.ts)
+ */
+export const EMOJI = {
+  // 系統狀態
+  success: '🎉',
+  ready: '✨',
+  warning: '⚠️',
+  error: '❌',
+  locked: '🔒',
+  pending: '⏳',
+  refresh: '🔄',
+
+  // 資源 / 數值
+  energy: '⚡',
+  gold: '💰',
+  exp: '🎯',
+  level: '⚔️',
+
+  // 動作
+  harvest: '🚜',
+  plant: '🌱',
+  visit: '🤝',
+
+  // 實體 / 標題
+  character: '🛡️',
+  farm: '🌿',
+  brand: '🌿',
+  bot: '🤖',
+  location: '📍',
+  empty: '⬜',
 } as const;
 
 /** 產生 ▰▰▰▱▱▱▱▱▱▱ 樣式的進度條 */
