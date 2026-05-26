@@ -3,6 +3,7 @@ import type {
   ChatInputCommandInteraction,
   ModalSubmitInteraction,
   SlashCommandBuilder,
+  StringSelectMenuInteraction,
 } from 'discord.js';
 
 import * as ping from './ping.js';
@@ -19,6 +20,8 @@ export interface Command {
   handleModalSubmit?: (interaction: ModalSubmitInteraction) => Promise<boolean>;
   /** (可選)處理 button click;回傳 true 表示已處理 */
   handleButton?: (interaction: ButtonInteraction) => Promise<boolean>;
+  /** (可選)處理 string select menu;回傳 true 表示已處理 */
+  handleSelectMenu?: (interaction: StringSelectMenuInteraction) => Promise<boolean>;
 }
 
 export const commands: readonly Command[] = [

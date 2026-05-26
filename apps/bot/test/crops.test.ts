@@ -1,9 +1,15 @@
 /**
  * 作物生長計算 + 升級數學的單元測試。
- * 跑法:pnpm --filter @idletime/bot test:crops
+ * 跑法:pnpm --filter @idletime/bot test
  */
 import { strict as assert } from 'node:assert';
-import { computeCropProgress, CROPS } from '../src/lib/crops.js';
+import {
+  computeCropProgress,
+  CROPS,
+  unlockedCrops,
+  nextLockedCrops,
+  allCropsByLevel,
+} from '../src/lib/crops.js';
 import { addExp, expForNextLevel } from '../src/lib/leveling.js';
 
 let passed = 0;
@@ -54,13 +60,16 @@ test('種下 1 小時(超過很多)→ 依然 ready, 100%', () => {
 });
 
 test('99% 上限:14 分 59 秒 → 99% 不到 100', () => {
-  // 14:59 / 15:00 = 99.88...% → floor 99
   const r = computeCropProgress(base, 15 * 60, new Date(base.getTime() + 14 * MIN + 59 * 1000));
   assert.equal(r.ready, false);
   assert.equal(r.progress, 99);
 });
 
-console.log('\n[CROPS 設定一致性]');
+console.log('\n[CROPS 設定一致性 — 16 種作物]');
+
+test('共 16 種作物', () => {
+  assert.equal(Object.keys(CROPS).length, 16);
+});
 
 test('每個 CROP 的 seedId 都有 _seed 後綴', () => {
   for (const crop of Object.values(CROPS)) {
@@ -68,25 +77,90 @@ test('每個 CROP 的 seedId 都有 _seed 後綴', () => {
   }
 });
 
-test('解鎖等級遞增(wheat ≤ carrot ≤ pumpkin)', () => {
-  assert.ok(CROPS.wheat!.unlockLevel <= CROPS.carrot!.unlockLevel);
-  assert.ok(CROPS.carrot!.unlockLevel <= CROPS.pumpkin!.unlockLevel);
+test('解鎖等級嚴格遞增(依 allCropsByLevel 排序)', () => {
+  const sorted = allCropsByLevel();
+  for (let i = 1; i < sorted.length; i++) {
+    assert.ok(
+      sorted[i]!.unlockLevel > sorted[i - 1]!.unlockLevel,
+      `${sorted[i]!.id} (Lv ${sorted[i]!.unlockLevel}) 應該 > ${sorted[i - 1]!.id} (Lv ${sorted[i - 1]!.unlockLevel})`,
+    );
+  }
 });
 
-test('成熟時間遞增(高級作物 = 久)', () => {
-  assert.ok(CROPS.wheat!.growSeconds < CROPS.carrot!.growSeconds);
-  assert.ok(CROPS.carrot!.growSeconds < CROPS.pumpkin!.growSeconds);
+test('成熟時間遞增(高級 = 久)', () => {
+  const sorted = allCropsByLevel();
+  for (let i = 1; i < sorted.length; i++) {
+    assert.ok(sorted[i]!.growSeconds > sorted[i - 1]!.growSeconds);
+  }
 });
 
-test('XP 報酬遞增', () => {
-  assert.ok(CROPS.wheat!.xpReward < CROPS.carrot!.xpReward);
-  assert.ok(CROPS.carrot!.xpReward < CROPS.pumpkin!.xpReward);
+test('XP 報酬遞增,但 XP/分鐘 嚴格遞減(diminishing returns)', () => {
+  const sorted = allCropsByLevel();
+  for (let i = 1; i < sorted.length; i++) {
+    assert.ok(sorted[i]!.xpReward > sorted[i - 1]!.xpReward, 'XP 應遞增');
+    const xpPerMinNow = sorted[i]!.xpReward / (sorted[i]!.growSeconds / 60);
+    const xpPerMinPrev = sorted[i - 1]!.xpReward / (sorted[i - 1]!.growSeconds / 60);
+    assert.ok(
+      xpPerMinNow < xpPerMinPrev,
+      `${sorted[i]!.id} XP/分 (${xpPerMinNow.toFixed(3)}) 應 < ${sorted[i - 1]!.id} (${xpPerMinPrev.toFixed(3)})`,
+    );
+  }
+});
+
+test('金幣/分鐘 嚴格遞增(長作物回報補償)', () => {
+  const sorted = allCropsByLevel();
+  for (let i = 1; i < sorted.length; i++) {
+    const goldPerMinNow = sorted[i]!.sellPrice / (sorted[i]!.growSeconds / 60);
+    const goldPerMinPrev = sorted[i - 1]!.sellPrice / (sorted[i - 1]!.growSeconds / 60);
+    assert.ok(
+      goldPerMinNow > goldPerMinPrev,
+      `${sorted[i]!.id} 金/分 (${goldPerMinNow.toFixed(3)}) 應 > ${sorted[i - 1]!.id} (${goldPerMinPrev.toFixed(3)})`,
+    );
+  }
+});
+
+test('體力消耗也漸增', () => {
+  const sorted = allCropsByLevel();
+  for (let i = 1; i < sorted.length; i++) {
+    assert.ok(
+      sorted[i]!.energyCost >= sorted[i - 1]!.energyCost,
+      `${sorted[i]!.id} 體力 (${sorted[i]!.energyCost}) 應 >= ${sorted[i - 1]!.id} (${sorted[i - 1]!.energyCost})`,
+    );
+  }
+});
+
+console.log('\n[unlockedCrops / nextLockedCrops]');
+
+test('Lv 1 → 只有小麥解鎖', () => {
+  const u = unlockedCrops(1);
+  assert.equal(u.length, 1);
+  assert.equal(u[0]!.id, 'wheat');
+});
+
+test('Lv 5 → 解鎖 3 個(wheat, carrot, potato)', () => {
+  const u = unlockedCrops(5);
+  assert.equal(u.length, 3);
+  assert.deepEqual(u.map((c) => c.id), ['wheat', 'carrot', 'potato']);
+});
+
+test('Lv 100 → 全部 16 個解鎖', () => {
+  assert.equal(unlockedCrops(100).length, 16);
+});
+
+test('Lv 1 的下個解鎖目標是 carrot (Lv 3)', () => {
+  const n = nextLockedCrops(1, 2);
+  assert.equal(n.length, 2);
+  assert.equal(n[0]!.id, 'carrot');
+  assert.equal(n[1]!.id, 'potato');
+});
+
+test('Lv 100 沒有下個解鎖', () => {
+  assert.equal(nextLockedCrops(100, 2).length, 0);
 });
 
 console.log('\n[addExp — 升級邏輯]');
 
 test('Lv 1 + 50 XP (不夠升)→ 還在 Lv 1', () => {
-  // expForNextLevel(1) = floor(100 * 1^1.5) = 100
   const r = addExp(1, 0, 50);
   assert.equal(r.level, 1);
   assert.equal(r.exp, 50);
@@ -108,8 +182,6 @@ test('Lv 1 + 150 XP → 升 Lv 2, 剩 50 XP', () => {
 });
 
 test('連跳兩級:Lv 1 + 500 XP', () => {
-  // need 100 (→Lv2) + 282 (→Lv3) = 382 → Lv 3, 剩 118
-  // expForNextLevel(2) = floor(100 * 2^1.5) = floor(282.84) = 282
   const r = addExp(1, 0, 500);
   assert.equal(r.level, 3);
   assert.equal(r.exp, 500 - 100 - 282);

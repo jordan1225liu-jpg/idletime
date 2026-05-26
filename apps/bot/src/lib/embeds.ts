@@ -1,7 +1,7 @@
 import { EmbedBuilder } from 'discord.js';
 import { expForNextLevel, levelProgress } from './leveling.js';
 import { formatEnergyStatus } from './energy.js';
-import { CROPS } from './crops.js';
+import { unlockedCrops, nextLockedCrops } from './crops.js';
 import type { PlotState } from './farm.js';
 import type { CharacterWithGuild } from './character.js';
 
@@ -83,7 +83,7 @@ export function buildWelcomeEmbed(characterName: string): EmbedBuilder {
         '',
         '**接下來試試:**',
         '• `/me` 看你的角色資訊',
-        '• `/farm` 開始種田(尚未開放)',
+        '• `/farm` 開始種田',
         '• `/visit @朋友` 拜訪好友(尚未開放)',
       ].join('\n'),
     );
@@ -110,7 +110,6 @@ export function buildFarmEmbed(params: {
     if (plot.status === 'ready') {
       return `${num} ${plot.crop!.emoji} **${plot.crop!.name}** ✨ 可收成`;
     }
-    // growing
     const bar = makeProgressBar(plot.progress ?? 0, 12);
     const remaining = formatDuration(Math.ceil((plot.msUntilReady ?? 0) / 1000));
     return `${num} ${plot.crop!.emoji} ${plot.crop!.name} ${bar} ${plot.progress}% (剩 ${remaining})`;
@@ -121,14 +120,25 @@ export function buildFarmEmbed(params: {
   const xpProgress = Math.floor((farmingSkill.exp / xpNeeded) * 100);
   const xpBar = makeProgressBar(xpProgress, 8);
 
-  // 可種作物清單
-  const cropOptions = Object.values(CROPS)
-    .map((c) => {
-      const locked = c.unlockLevel > farmingSkill.level;
-      const lockTag = locked ? ` 🔒 需 Lv ${c.unlockLevel}` : '';
-      return `${c.emoji} **${c.name}** — ${formatDuration(c.growSeconds)} / -${c.energyCost} 體力${lockTag}`;
-    })
-    .join('\n');
+  // 已解鎖作物(顯示最近 6 個,避免過長)
+  const allUnlocked = unlockedCrops(farmingSkill.level);
+  const showUnlocked = allUnlocked.slice(-6);
+  const unlockedLines = showUnlocked.map((c) => {
+    return `${c.emoji} **${c.name}** — ${formatDuration(c.growSeconds)} · +${c.xpReward} XP · 售 ${c.sellPrice}💰`;
+  });
+  const hiddenCount = allUnlocked.length - showUnlocked.length;
+  const unlockedText =
+    (hiddenCount > 0 ? `_(早期 ${hiddenCount} 種作物已隱藏)_\n` : '') +
+    (unlockedLines.length > 0 ? unlockedLines.join('\n') : '_目前無可種作物_');
+
+  // 下個解鎖目標(2 個)
+  const nextLocked = nextLockedCrops(farmingSkill.level, 2);
+  const nextText =
+    nextLocked.length === 0
+      ? '🌟 已解鎖全部作物!你是農業大師'
+      : nextLocked
+          .map((c) => `🔒 ${c.emoji} **${c.name}** — Lv ${c.unlockLevel} · ${formatDuration(c.growSeconds)}`)
+          .join('\n');
 
   let description = `📍 ${character.activeGuild?.name ?? '(未知公會)'}`;
   if (notification) description += `\n\n${notification}`;
@@ -145,6 +155,7 @@ export function buildFarmEmbed(params: {
         value: `**Lv ${farmingSkill.level}**\n${xpBar}\n${farmingSkill.exp} / ${xpNeeded} XP`,
         inline: true,
       },
-      { name: '🌾 可種作物', value: cropOptions, inline: false },
+      { name: '🌾 已解鎖作物', value: unlockedText, inline: false },
+      { name: '🔒 下個解鎖目標', value: nextText, inline: false },
     );
 }

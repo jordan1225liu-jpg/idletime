@@ -1,6 +1,12 @@
 /**
- * 作物資料 — MVP 階段先 3 種,Phase 2 會依 GDD §5.5 路線圖擴充到 16 種。
- * 不放 DB:作物資料 = 遊戲設定,改動需要程式碼版本控制,不適合 runtime 寫入。
+ * 完整 16 種作物 (Lv 1-100),依 GDD §5.5 設計。
+ *
+ * 設計公式:
+ * - XP ≈ floor(分鐘數^0.6)  → 對數成長,主動玩 XP/分 較高,長作物 XP/分 較低
+ * - 售價 ≈ floor(XP² × 4 ~ 6)→ 指數成長,長作物金幣回報補償時間
+ * - 結果:玩家可依「我有多少時間」自主選擇短/長作物
+ *
+ * 體力消耗也隨等級緩步增加:Lv 1-5 都是 5,Lv 100 為 25(換算後對體力上限的負擔仍合理)
  */
 
 export interface Crop {
@@ -18,7 +24,11 @@ export interface Crop {
   unlockLevel: number;
   /** 收成獲得的農場技能 XP */
   xpReward: number;
+  /** 賣給 NPC 商人的單價(銅幣);也用於初始化 Item.sell_price */
+  sellPrice: number;
 }
+
+const HOUR = 60 * 60;
 
 export const CROPS: Record<string, Crop> = {
   wheat: {
@@ -30,30 +40,193 @@ export const CROPS: Record<string, Crop> = {
     energyCost: 5,
     unlockLevel: 1,
     xpReward: 5,
+    sellPrice: 2,
   },
   carrot: {
     id: 'carrot',
     seedId: 'carrot_seed',
     emoji: '🥕',
     name: '胡蘿蔔',
-    growSeconds: 45 * 60,
+    growSeconds: 30 * 60,
     energyCost: 5,
     unlockLevel: 3,
-    xpReward: 15,
+    xpReward: 8,
+    sellPrice: 5,
+  },
+  potato: {
+    id: 'potato',
+    seedId: 'potato_seed',
+    emoji: '🥔',
+    name: '馬鈴薯',
+    growSeconds: 60 * 60,
+    energyCost: 5,
+    unlockLevel: 5,
+    xpReward: 12,
+    sellPrice: 12,
+  },
+  tomato: {
+    id: 'tomato',
+    seedId: 'tomato_seed',
+    emoji: '🍅',
+    name: '番茄',
+    growSeconds: 2 * HOUR,
+    energyCost: 6,
+    unlockLevel: 8,
+    xpReward: 16,
+    sellPrice: 30,
+  },
+  corn: {
+    id: 'corn',
+    seedId: 'corn_seed',
+    emoji: '🌽',
+    name: '玉米',
+    growSeconds: 4 * HOUR,
+    energyCost: 6,
+    unlockLevel: 12,
+    xpReward: 25,
+    sellPrice: 75,
   },
   pumpkin: {
     id: 'pumpkin',
     seedId: 'pumpkin_seed',
     emoji: '🎃',
     name: '南瓜',
-    growSeconds: 3 * 60 * 60,
-    energyCost: 5,
-    unlockLevel: 5,
-    xpReward: 60,
+    growSeconds: 6 * HOUR,
+    energyCost: 7,
+    unlockLevel: 15,
+    xpReward: 33,
+    sellPrice: 130,
+  },
+  chili: {
+    id: 'chili',
+    seedId: 'chili_seed',
+    emoji: '🌶️',
+    name: '辣椒',
+    growSeconds: 8 * HOUR,
+    energyCost: 7,
+    unlockLevel: 20,
+    xpReward: 39,
+    sellPrice: 200,
+  },
+  cotton: {
+    id: 'cotton',
+    seedId: 'cotton_seed',
+    emoji: '🤍',
+    name: '棉花',
+    growSeconds: 12 * HOUR,
+    energyCost: 8,
+    unlockLevel: 25,
+    xpReward: 51,
+    sellPrice: 350,
+  },
+  strawberry: {
+    id: 'strawberry',
+    seedId: 'strawberry_seed',
+    emoji: '🍓',
+    name: '草莓',
+    growSeconds: 16 * HOUR,
+    energyCost: 8,
+    unlockLevel: 30,
+    xpReward: 62,
+    sellPrice: 550,
+  },
+  grape: {
+    id: 'grape',
+    seedId: 'grape_seed',
+    emoji: '🍇',
+    name: '葡萄',
+    growSeconds: 24 * HOUR,
+    energyCost: 10,
+    unlockLevel: 40,
+    xpReward: 80,
+    sellPrice: 1000,
+  },
+  watermelon: {
+    id: 'watermelon',
+    seedId: 'watermelon_seed',
+    emoji: '🍉',
+    name: '西瓜',
+    growSeconds: 36 * HOUR,
+    energyCost: 10,
+    unlockLevel: 50,
+    xpReward: 105,
+    sellPrice: 1800,
+  },
+  tea: {
+    id: 'tea',
+    seedId: 'tea_seed',
+    emoji: '🍵',
+    name: '茶葉',
+    growSeconds: 48 * HOUR,
+    energyCost: 12,
+    unlockLevel: 60,
+    xpReward: 125,
+    sellPrice: 3000,
+  },
+  apple: {
+    id: 'apple',
+    seedId: 'apple_seed',
+    emoji: '🍎',
+    name: '蘋果',
+    growSeconds: 60 * HOUR,
+    energyCost: 12,
+    unlockLevel: 70,
+    xpReward: 144,
+    sellPrice: 4800,
+  },
+  winegrape: {
+    id: 'winegrape',
+    seedId: 'winegrape_seed',
+    emoji: '🍷',
+    name: '釀酒葡萄',
+    growSeconds: 72 * HOUR,
+    energyCost: 15,
+    unlockLevel: 80,
+    xpReward: 161,
+    sellPrice: 7500,
+  },
+  herb: {
+    id: 'herb',
+    seedId: 'herb_seed',
+    emoji: '🌿',
+    name: '神祕藥草',
+    growSeconds: 96 * HOUR,
+    energyCost: 18,
+    unlockLevel: 90,
+    xpReward: 195,
+    sellPrice: 13000,
+  },
+  goldwheat: {
+    id: 'goldwheat',
+    seedId: 'goldwheat_seed',
+    emoji: '🌟',
+    name: '黃金小麥',
+    growSeconds: 144 * HOUR,
+    energyCost: 25,
+    unlockLevel: 100,
+    xpReward: 254,
+    sellPrice: 28000,
   },
 };
 
 export type CropId = keyof typeof CROPS;
+
+/** 取得所有作物,依解鎖等級排序 */
+export function allCropsByLevel(): Crop[] {
+  return Object.values(CROPS).sort((a, b) => a.unlockLevel - b.unlockLevel);
+}
+
+/** 給定當前農場技能等級,回傳已解鎖的作物 */
+export function unlockedCrops(farmingLevel: number): Crop[] {
+  return allCropsByLevel().filter((c) => c.unlockLevel <= farmingLevel);
+}
+
+/** 給定當前等級,回傳下 N 個還沒解鎖的作物(預設 2 個,給玩家「下個目標」感)*/
+export function nextLockedCrops(farmingLevel: number, count = 2): Crop[] {
+  return allCropsByLevel()
+    .filter((c) => c.unlockLevel > farmingLevel)
+    .slice(0, count);
+}
 
 /** 純函式:給定種下時間與生長秒數,算出進度狀態 */
 export function computeCropProgress(

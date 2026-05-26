@@ -3,25 +3,37 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
   MessageFlags,
   type ChatInputCommandInteraction,
   type ButtonInteraction,
+  type StringSelectMenuInteraction,
 } from 'discord.js';
 import { settleEnergy } from '../lib/energy.js';
 import { getFarmState, plantCrop, harvestAll, getFarmingSkill } from '../lib/farm.js';
 import { buildFarmEmbed } from '../lib/embeds.js';
-import { CROPS } from '../lib/crops.js';
+import { unlockedCrops } from '../lib/crops.js';
 
 export const data = new SlashCommandBuilder()
   .setName('farm')
   .setDescription('🌾 查看與管理你的農場');
 
-const BUTTON_PREFIX = 'farm:';
-const BUTTON_PLANT_PREFIX = 'farm:plant:';
+const SELECT_PLANT = 'farm:plant-select';
 const BUTTON_HARVEST = 'farm:harvest';
 const BUTTON_REFRESH = 'farm:refresh';
+const FARM_PREFIX = 'farm:';
 
-/** 組裝完整的 farm UI(embed + buttons),共用於 /farm 跟所有 button 回應 */
+function formatDurationShort(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  if (m < 60) return `${m}分`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  return `${d}天`;
+}
+
+/** 組裝完整的 farm UI(embed + select menu + buttons),共用於 /farm 跟所有 button/select 回應 */
 async function buildFarmUI(userId: string, notification?: string) {
   const character = await settleEnergy(userId);
   if (!character) return null;
@@ -36,37 +48,55 @@ async function buildFarmUI(userId: string, notification?: string) {
   const hasEmpty = plots.some((p) => p.status === 'empty');
   const hasReady = plots.some((p) => p.status === 'ready');
 
-  const row = new ActionRowBuilder<ButtonBuilder>();
+  // ─── Plant select menu ──────────────────────────────────────
+  const unlocked = unlockedCrops(farmingSkill.level);
+  const selectMenu = new StringSelectMenuBuilder()
+    .setCustomId(SELECT_PLANT)
+    .setPlaceholder(hasEmpty ? '🌱 選擇要種的作物' : '🚫 沒有空田,先收成')
+    .setDisabled(!hasEmpty || unlocked.length === 0);
 
-  for (const crop of Object.values(CROPS)) {
-    const locked = crop.unlockLevel > farmingSkill.level;
-    const noEnergy = character.energy < crop.energyCost;
-    const disabled = locked || noEnergy || !hasEmpty;
-
-    row.addComponents(
-      new ButtonBuilder()
-        .setCustomId(`${BUTTON_PLANT_PREFIX}${crop.id}`)
-        .setLabel(crop.name)
-        .setEmoji(crop.emoji)
-        .setStyle(ButtonStyle.Success)
-        .setDisabled(disabled),
+  if (unlocked.length > 0) {
+    for (const crop of unlocked) {
+      const affordable = character.energy >= crop.energyCost;
+      const label = `${crop.name} (${formatDurationShort(crop.growSeconds)})`;
+      const desc = `+${crop.xpReward} XP · 售 ${crop.sellPrice}💰 · -${crop.energyCost}⚡${affordable ? '' : ' ⚠️體力不足'}`;
+      selectMenu.addOptions(
+        new StringSelectMenuOptionBuilder()
+          .setLabel(label.slice(0, 100))
+          .setValue(crop.id)
+          .setEmoji(crop.emoji)
+          .setDescription(desc.slice(0, 100)),
+      );
+    }
+  } else {
+    // Discord 不允許 select menu 沒選項。沒解鎖任何作物時加 placeholder
+    selectMenu.addOptions(
+      new StringSelectMenuOptionBuilder()
+        .setLabel('暫無可種作物')
+        .setValue('__none__')
+        .setDescription('提升農場技能後解鎖'),
     );
+    selectMenu.setDisabled(true);
   }
 
-  row.addComponents(
+  const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+
+  // ─── Action buttons ─────────────────────────────────────────
+  const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(BUTTON_HARVEST)
-      .setLabel('收成')
+      .setLabel('收成全部')
       .setEmoji('🚜')
       .setStyle(ButtonStyle.Primary)
       .setDisabled(!hasReady),
     new ButtonBuilder()
       .setCustomId(BUTTON_REFRESH)
+      .setLabel('刷新')
       .setEmoji('🔄')
       .setStyle(ButtonStyle.Secondary),
   );
 
-  return { embed, components: [row] };
+  return { embed, components: [selectRow, buttonRow] };
 }
 
 export async function execute(interaction: ChatInputCommandInteraction) {
@@ -81,36 +111,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.reply({ embeds: [ui.embed], components: ui.components });
 }
 
-/** Button handler:處理 farm: 開頭的所有 button */
+/** Button handler:處理 farm:harvest 與 farm:refresh */
 export async function handleButton(interaction: ButtonInteraction): Promise<boolean> {
-  if (!interaction.customId.startsWith(BUTTON_PREFIX)) return false;
-
+  if (!interaction.customId.startsWith(FARM_PREFIX)) return false;
   const userId = interaction.user.id;
 
-  // 種植
-  if (interaction.customId.startsWith(BUTTON_PLANT_PREFIX)) {
-    const cropId = interaction.customId.slice(BUTTON_PLANT_PREFIX.length);
-    const result = await plantCrop(userId, cropId);
-
-    if (!result.ok) {
-      const ui = await buildFarmUI(userId, `⚠️ ${result.reason}`);
-      if (ui) {
-        await interaction.update({ embeds: [ui.embed], components: ui.components });
-      }
-      return true;
-    }
-
-    const ui = await buildFarmUI(
-      userId,
-      `🌱 種下了 ${result.crop.emoji} **${result.crop.name}** 在 ${result.plotIndex + 1} 號田`,
-    );
-    if (ui) {
-      await interaction.update({ embeds: [ui.embed], components: ui.components });
-    }
-    return true;
-  }
-
-  // 收成
   if (interaction.customId === BUTTON_HARVEST) {
     const result = await harvestAll(userId);
 
@@ -128,20 +133,42 @@ export async function handleButton(interaction: ButtonInteraction): Promise<bool
     }
 
     const ui = await buildFarmUI(userId, notification);
-    if (ui) {
-      await interaction.update({ embeds: [ui.embed], components: ui.components });
-    }
+    if (ui) await interaction.update({ embeds: [ui.embed], components: ui.components });
     return true;
   }
 
-  // 刷新
   if (interaction.customId === BUTTON_REFRESH) {
     const ui = await buildFarmUI(userId);
-    if (ui) {
-      await interaction.update({ embeds: [ui.embed], components: ui.components });
-    }
+    if (ui) await interaction.update({ embeds: [ui.embed], components: ui.components });
     return true;
   }
 
   return false;
+}
+
+/** Select menu handler:處理 farm:plant-select(種植) */
+export async function handleSelectMenu(
+  interaction: StringSelectMenuInteraction,
+): Promise<boolean> {
+  if (interaction.customId !== SELECT_PLANT) return false;
+  const userId = interaction.user.id;
+  const cropId = interaction.values[0];
+
+  if (!cropId || cropId === '__none__') {
+    await interaction.deferUpdate();
+    return true;
+  }
+
+  const result = await plantCrop(userId, cropId);
+
+  let notification: string;
+  if (!result.ok) {
+    notification = `⚠️ ${result.reason}`;
+  } else {
+    notification = `🌱 種下了 ${result.crop.emoji} **${result.crop.name}** 在 ${result.plotIndex + 1} 號田`;
+  }
+
+  const ui = await buildFarmUI(userId, notification);
+  if (ui) await interaction.update({ embeds: [ui.embed], components: ui.components });
+  return true;
 }
