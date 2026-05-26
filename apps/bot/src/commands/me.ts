@@ -3,7 +3,8 @@ import {
   MessageFlags,
   type ChatInputCommandInteraction,
 } from 'discord.js';
-import { ensureGuildContext, getCharacter } from '../lib/character.js';
+import { ensureGuildContext } from '../lib/character.js';
+import { settleEnergy } from '../lib/energy.js';
 import { buildCharacterEmbed } from '../lib/embeds.js';
 
 export const data = new SlashCommandBuilder()
@@ -11,7 +12,8 @@ export const data = new SlashCommandBuilder()
   .setDescription('🛡️ 查看你的角色面板');
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  const character = await getCharacter(interaction.user.id);
+  // 1. 先 settle 體力(就算只是純查看也要,因為玩家想看到最新數字)
+  let character = await settleEnergy(interaction.user.id);
 
   if (!character) {
     await interaction.reply({
@@ -21,21 +23,19 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  // 如果在新的 Discord 伺服器,更新 activeGuild context
-  if (interaction.guildId && interaction.guild) {
-    if (character.activeGuildId !== interaction.guildId) {
-      await ensureGuildContext({
-        userId: interaction.user.id,
-        guildId: interaction.guildId,
-        guildName: interaction.guild.name,
-      });
-      // 重抓更新後的角色
-      const refreshed = await getCharacter(interaction.user.id);
-      if (refreshed) {
-        await interaction.reply({ embeds: [buildCharacterEmbed(refreshed)] });
-        return;
-      }
-    }
+  // 2. 如果換到別的 Discord 伺服器,更新 active guild
+  if (
+    interaction.guildId &&
+    interaction.guild &&
+    character.activeGuildId !== interaction.guildId
+  ) {
+    await ensureGuildContext({
+      userId: interaction.user.id,
+      guildId: interaction.guildId,
+      guildName: interaction.guild.name,
+    });
+    // 重抓一次拿到新的 activeGuild
+    character = (await settleEnergy(interaction.user.id)) ?? character;
   }
 
   await interaction.reply({ embeds: [buildCharacterEmbed(character)] });

@@ -1,5 +1,6 @@
 import { EmbedBuilder } from 'discord.js';
 import { expForNextLevel, levelProgress } from './leveling.js';
+import { formatEnergyStatus } from './energy.js';
 import type { CharacterWithGuild } from './character.js';
 
 /** 主題色,跟 GDD §8.2 一致 */
@@ -56,7 +57,7 @@ export function buildCharacterEmbed(character: CharacterWithGuild): EmbedBuilder
       },
       {
         name: '❤️ 體力',
-        value: `**${character.energy}** / ${character.energyMax}`,
+        value: formatEnergyStatus(character),
         inline: true,
       },
     )
