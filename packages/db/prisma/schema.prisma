@@ -30,8 +30,9 @@ model User {
 
   friendshipsAsA Friendship[] @relation("FriendshipUserA")
   friendshipsAsB Friendship[] @relation("FriendshipUserB")
-  visitsGiven    DailyVisit[] @relation("VisitsGiven")
-  visitsReceived DailyVisit[] @relation("VisitsReceived")
+  visitsAsA      Visit[]      @relation("VisitUserA")
+  visitsAsB      Visit[]      @relation("VisitUserB")
+  visitsInitiated Visit[]     @relation("VisitInitiator")
 
   @@map("users")
 }
@@ -173,19 +174,26 @@ model Friendship {
   @@map("friendships")
 }
 
-/// 每日拜訪紀錄,用來防刷 + 計算當日 buff
-model DailyVisit {
-  visitorId String   @map("visitor_id")
-  visitedId String   @map("visited_id")
-  visitDate DateTime @map("visit_date") @db.Date
-  createdAt DateTime @default(now()) @map("created_at")
+/// 拜訪紀錄。Convention: userIdA < userIdB (lex) 確保同一對玩家的查詢統一。
+/// acceptedAt = null 表示 pending,有值代表完成,expiresAt 過了則 pending 視為失效。
+/// per-pair 30 分鐘 CD = 找最近 acceptedAt 在 30 分鐘內的 row 即可。
+model Visit {
+  id          Int       @id @default(autoincrement())
+  userIdA     String    @map("user_id_a")
+  userIdB     String    @map("user_id_b")
+  initiatorId String    @map("initiator_id")
+  acceptedAt  DateTime? @map("accepted_at")
+  expiresAt   DateTime  @map("expires_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
-  visitor User @relation("VisitsGiven", fields: [visitorId], references: [id], onDelete: Cascade)
-  visited User @relation("VisitsReceived", fields: [visitedId], references: [id], onDelete: Cascade)
+  userA     User @relation("VisitUserA", fields: [userIdA], references: [id], onDelete: Cascade)
+  userB     User @relation("VisitUserB", fields: [userIdB], references: [id], onDelete: Cascade)
+  initiator User @relation("VisitInitiator", fields: [initiatorId], references: [id])
 
-  @@id([visitorId, visitedId, visitDate])
-  @@index([visitorId, visitDate]) // 查詢 "我今天拜訪過幾個人"
-  @@map("daily_visits")
+  @@index([userIdA, userIdB, acceptedAt])
+  @@index([userIdB])
+  @@index([initiatorId])
+  @@map("visits")
 }
 
 // ═══════════════════════════════════════════════════════════════

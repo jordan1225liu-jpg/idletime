@@ -104,6 +104,31 @@ export async function spendEnergy(
   return { ok: true, character: after };
 }
 
+/**
+ * 加 amount 點體力,不超過 energyMax。回傳更新後的 character 與實際加了多少(可能 0,如果已滿)。
+ * 內部已 settle,所以 character 是最新狀態。
+ */
+export async function grantEnergy(
+  userId: string,
+  amount: number,
+): Promise<{ character: CharacterWithGuild; gained: number }> {
+  const before = await settleEnergy(userId);
+  if (!before) throw new Error(`No character for user ${userId}`);
+
+  const newEnergy = Math.min(before.energyMax, before.energy + amount);
+  const gained = newEnergy - before.energy;
+
+  if (gained === 0) return { character: before, gained: 0 };
+
+  const character = await prisma.character.update({
+    where: { userId },
+    data: { energy: newEnergy },
+    include: { activeGuild: true },
+  });
+
+  return { character, gained };
+}
+
 /** 距離下一點體力恢復還剩多少毫秒(滿了回 0) */
 export function msUntilNextEnergy(state: EnergyState, now: Date = new Date()): number {
   if (state.energy >= state.energyMax) return 0;

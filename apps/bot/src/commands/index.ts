@@ -10,6 +10,7 @@ import * as ping from './ping.js';
 import * as start from './start.js';
 import * as me from './me.js';
 import * as farm from './farm.js';
+import * as visit from './visit.js';
 
 export interface Command {
   /** Slash command 定義(會被序列化送給 Discord 註冊)*/
@@ -29,4 +30,5 @@ export const commands: readonly Command[] = [
   start as Command,
   me as Command,
   farm as Command,
+  visit as Command,
 ];

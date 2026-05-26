@@ -10,7 +10,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "tsx test/energy.test.ts && tsx test/crops.test.ts"
+    "test": "tsx test/energy.test.ts && tsx test/crops.test.ts && tsx test/visit.test.ts"
   },
   "dependencies": {
     "@idletime/db": "workspace:*",
