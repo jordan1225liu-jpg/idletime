@@ -313,3 +313,20 @@ model CampaignProgress {
 
   @@map("campaign_progress")
 }
+
+// ═══════════════════════════════════════════════════════════════
+// HUNT SESSIONS (進行中的狩獵 — 存 DB 才不會因 bot 重啟而消失)
+// ═══════════════════════════════════════════════════════════════
+
+/// 進行中/待接受的狩獵。整個 session 序列化存在 data(JSON):region 存 regionId、
+/// accepted 存陣列,其餘照原樣。改存 DB(原本在記憶體 Map)→ 部署/重啟後狩獵不中斷。
+/// 30 分鐘 TTL 由 createNew 時 deleteMany 過期列清掉。
+model HuntSession {
+  id        String   @id // 8 碼 session id
+  data      Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([createdAt])
+  @@map("hunt_sessions")
+}

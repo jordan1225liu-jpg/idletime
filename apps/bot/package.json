@@ -10,6 +10,7 @@
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "gen:art": "tsx scripts/generate-art.ts",
+    "gen:monsters": "tsx scripts/generate-monsters.ts",
     "test": "tsx test/energy.test.ts && tsx test/crops.test.ts && tsx test/visit.test.ts && tsx test/fish.test.ts && tsx test/combat.test.ts && tsx test/campaign.test.ts"
   },
   "dependencies": {

@@ -14,6 +14,7 @@ import {
 import { getCharacter } from '../lib/character.js';
 import { getPotionInventory } from '../lib/potions.js';
 import { COLORS, makeProgressBar } from '../lib/embeds.js';
+import { assetUrl } from '../lib/assets.js';
 import { REGIONS } from '../lib/monsters.js';
 import type { CombatResult } from '../lib/combat.js';
 import {
@@ -59,7 +60,7 @@ function inviteEmbed(session: HuntSession): EmbedBuilder {
   const accepted = session.memberIds.map((id) =>
     session.accepted.has(id) ? `✅ <@${id}>` : `⌛ <@${id}>`,
   );
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setColor(COLORS.GOLD)
     .setTitle('🏹 狩獵邀請')
     .setDescription(
@@ -69,6 +70,9 @@ function inviteEmbed(session: HuntSession): EmbedBuilder {
         `所有隊友都按「接受」就開打。\n\n` +
         accepted.join('\n'),
     );
+  const banner = assetUrl(`regions/${r.id}`);
+  if (banner) embed.setImage(banner);
+  return embed;
 }
 
 function inviteComponents(sid: string): ActionRowBuilder<ButtonBuilder>[] {
@@ -142,6 +146,10 @@ function combatEmbed(session: HuntSession): EmbedBuilder {
     });
   }
 
+  // 右上角放「剛交手的那隻怪」的圖(用網址,避免每回合重傳附件)
+  const monsterImg = last ? assetUrl(`monsters/${last.monster.id}`) : null;
+  if (monsterImg) embed.setThumbnail(monsterImg);
+
   return embed;
 }
 
@@ -192,6 +200,9 @@ function rewardEmbed(session: HuntSession, reward: NonNullable<Awaited<ReturnTyp
     });
   }
 
+  const banner = assetUrl(`regions/${r.id}`);
+  if (banner) embed.setImage(banner);
+
   embed.setFooter({ text: '各自體力恢復後可再次組隊' });
   return embed;
 }
@@ -238,7 +249,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  const created = createHuntSession({
+  const created = await createHuntSession({
     leaderId: interaction.user.id,
     partnerIds: partners.map((p) => p.id),
     regionId,
@@ -257,7 +268,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     await interaction.deferReply();
     const combat = await startCombat(session.id);
     if (!combat.ok) {
-      cancelHunt(session.id);
+      await cancelHunt(session.id);
       await interaction.editReply({ content: `⚠️ ${combat.reason}` });
       return;
     }
@@ -298,7 +309,7 @@ export async function handleButton(interaction: ButtonInteraction): Promise<bool
 
   // ── 接受 ──
   if (action === 'accept') {
-    const result = acceptHunt(sid, userId);
+    const result = await acceptHunt(sid, userId);
     if (!result.ok) {
       await interaction.reply({ content: `⚠️ ${result.reason}`, flags: MessageFlags.Ephemeral });
       return true;
@@ -312,7 +323,7 @@ export async function handleButton(interaction: ButtonInteraction): Promise<bool
     await interaction.deferUpdate();
     const combat = await startCombat(sid);
     if (!combat.ok) {
-      cancelHunt(sid);
+      await cancelHunt(sid);
       await interaction.editReply({
         embeds: [new EmbedBuilder().setColor(COLORS.RED).setTitle('🏹 狩獵取消').setDescription(`⚠️ ${combat.reason}`)],
         components: [],
@@ -325,12 +336,12 @@ export async function handleButton(interaction: ButtonInteraction): Promise<bool
 
   // ── 拒絕 ──
   if (action === 'decline') {
-    const result = declineHunt(sid, userId);
+    const result = await declineHunt(sid, userId);
     if (!result.ok) {
       await interaction.reply({ content: `⚠️ ${result.reason}`, flags: MessageFlags.Ephemeral });
       return true;
     }
-    cancelHunt(sid);
+    await cancelHunt(sid);
     await interaction.update({
       embeds: [new EmbedBuilder().setColor(COLORS.RED).setTitle('🏹 狩獵取消').setDescription(`<@${userId}> 拒絕了邀請。`)],
       components: [],
@@ -339,7 +350,7 @@ export async function handleButton(interaction: ButtonInteraction): Promise<bool
   }
 
   // 以下 action 需要是隊員
-  const session = getSession(sid);
+  const session = await getSession(sid);
   if (!session) {
     // session 不在記憶體(多半是 bot 重啟或已過期)→ 清掉死按鈕,別再一直噴錯
     await expireHuntMessage(interaction);
@@ -352,7 +363,7 @@ export async function handleButton(interaction: ButtonInteraction): Promise<bool
 
   // ── 繼續 ──
   if (action === 'continue') {
-    const result = continueHunt(sid);
+    const result = await continueHunt(sid);
     if (!result.ok) {
       await interaction.reply({ content: `⚠️ ${result.reason}`, flags: MessageFlags.Ephemeral });
       return true;
@@ -421,7 +432,7 @@ export async function handleSelectMenu(interaction: StringSelectMenuInteraction)
   }
 
   const result = await applyHeal(sid, clickerId, potionId);
-  const session = getSession(sid);
+  const session = await getSession(sid);
   if (!result.ok || !session) {
     await interaction.reply({ content: `⚠️ ${result.ok ? '找不到狩獵' : result.reason}`, flags: MessageFlags.Ephemeral });
     return true;

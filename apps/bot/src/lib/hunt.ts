@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { prisma } from '@idletime/db';
+import { prisma, Prisma } from '@idletime/db';
 import { computeCombatStats } from './equipment.js';
 import { settleEnergy } from './energy.js';
 import { fightMonster, type CombatResult } from './combat.js';
@@ -63,29 +63,123 @@ export interface HuntSession {
   createdAt: number;
 }
 
-const sessions = new Map<string, HuntSession>();
+// ─── 持久化(存 DB,不再用記憶體 Map)────────────────────────────
+// region 存 regionId(從程式 catalog 還原)、accepted(Set)存陣列,其餘照原樣。
 
-function sweep() {
-  const now = Date.now();
-  for (const [id, s] of sessions) {
-    if (now - s.createdAt > SESSION_TTL_MS) sessions.delete(id);
-  }
+interface PersistedSession {
+  id: string;
+  regionId: string;
+  leaderId: string;
+  memberIds: string[];
+  accepted: string[];
+  declinedBy: string | null;
+  partySize: number;
+  difficultyMult: number;
+  rewardMult: number;
+  members: HuntMember[];
+  partyAttack: number;
+  partyDefense: number;
+  partyMaxHp: number;
+  partyHp: number;
+  monsters: Monster[];
+  currentIndex: number;
+  encounters: EncounterResult[];
+  status: HuntStatus;
+  createdAt: number;
 }
 
-export function getSession(id: string): HuntSession | undefined {
-  return sessions.get(id);
+function serialize(s: HuntSession): PersistedSession {
+  return {
+    id: s.id,
+    regionId: s.region.id,
+    leaderId: s.leaderId,
+    memberIds: s.memberIds,
+    accepted: [...s.accepted],
+    declinedBy: s.declinedBy,
+    partySize: s.partySize,
+    difficultyMult: s.difficultyMult,
+    rewardMult: s.rewardMult,
+    members: s.members,
+    partyAttack: s.partyAttack,
+    partyDefense: s.partyDefense,
+    partyMaxHp: s.partyMaxHp,
+    partyHp: s.partyHp,
+    monsters: s.monsters,
+    currentIndex: s.currentIndex,
+    encounters: s.encounters,
+    status: s.status,
+    createdAt: s.createdAt,
+  };
 }
 
-export function cancelHunt(id: string): void {
-  sessions.delete(id);
+function deserialize(p: PersistedSession): HuntSession | undefined {
+  const region = REGION_BY_ID[p.regionId];
+  if (!region) return undefined; // 地區 catalog 改過 → 當作失效
+  return {
+    id: p.id,
+    region,
+    leaderId: p.leaderId,
+    memberIds: p.memberIds,
+    accepted: new Set(p.accepted),
+    declinedBy: p.declinedBy,
+    partySize: p.partySize,
+    difficultyMult: p.difficultyMult,
+    rewardMult: p.rewardMult,
+    members: p.members,
+    partyAttack: p.partyAttack,
+    partyDefense: p.partyDefense,
+    partyMaxHp: p.partyMaxHp,
+    partyHp: p.partyHp,
+    monsters: p.monsters,
+    currentIndex: p.currentIndex,
+    encounters: p.encounters,
+    status: p.status,
+    createdAt: p.createdAt,
+  };
 }
 
-export function createHuntSession(params: {
+async function save(s: HuntSession): Promise<void> {
+  const data = serialize(s) as unknown as Prisma.InputJsonValue;
+  await prisma.huntSession.upsert({
+    where: { id: s.id },
+    create: { id: s.id, data },
+    update: { data },
+  });
+}
+
+async function load(id: string): Promise<HuntSession | undefined> {
+  const row = await prisma.huntSession.findUnique({ where: { id } });
+  if (!row) return undefined;
+  return deserialize(row.data as unknown as PersistedSession);
+}
+
+async function remove(id: string): Promise<void> {
+  await prisma.huntSession.delete({ where: { id } }).catch(() => {
+    /* 已不存在就忽略 */
+  });
+}
+
+async function sweepExpired(): Promise<void> {
+  const threshold = new Date(Date.now() - SESSION_TTL_MS);
+  await prisma.huntSession
+    .deleteMany({ where: { createdAt: { lt: threshold } } })
+    .catch(() => {});
+}
+
+export async function getSession(id: string): Promise<HuntSession | undefined> {
+  return load(id);
+}
+
+export async function cancelHunt(id: string): Promise<void> {
+  await remove(id);
+}
+
+export async function createHuntSession(params: {
   leaderId: string;
   partnerIds: string[];
   regionId: string;
-}): { ok: true; session: HuntSession } | { ok: false; reason: string } {
-  sweep();
+}): Promise<{ ok: true; session: HuntSession } | { ok: false; reason: string }> {
+  await sweepExpired();
   const region = REGION_BY_ID[params.regionId];
   if (!region) return { ok: false, reason: '未知地區' };
 
@@ -119,31 +213,33 @@ export function createHuntSession(params: {
     status: 'pending',
     createdAt: Date.now(),
   };
-  sessions.set(session.id, session);
+  await save(session);
   return { ok: true, session };
 }
 
-export function acceptHunt(
+export async function acceptHunt(
   sessionId: string,
   userId: string,
-): { ok: true; allAccepted: boolean; session: HuntSession } | { ok: false; reason: string } {
-  const session = sessions.get(sessionId);
+): Promise<{ ok: true; allAccepted: boolean; session: HuntSession } | { ok: false; reason: string }> {
+  const session = await load(sessionId);
   if (!session) return { ok: false, reason: '找不到此狩獵(可能已過期)' };
   if (session.status !== 'pending') return { ok: false, reason: '這個狩獵已經開始或結束了' };
   if (!session.memberIds.includes(userId)) return { ok: false, reason: '你不在這個隊伍裡' };
   session.accepted.add(userId);
+  await save(session);
   return { ok: true, allAccepted: session.accepted.size === session.memberIds.length, session };
 }
 
-export function declineHunt(
+export async function declineHunt(
   sessionId: string,
   userId: string,
-): { ok: true; session: HuntSession } | { ok: false; reason: string } {
-  const session = sessions.get(sessionId);
+): Promise<{ ok: true; session: HuntSession } | { ok: false; reason: string }> {
+  const session = await load(sessionId);
   if (!session) return { ok: false, reason: '找不到此狩獵' };
   if (!session.memberIds.includes(userId)) return { ok: false, reason: '你不在這個隊伍裡' };
   session.declinedBy = userId;
   session.status = 'completed'; // 標記結束(被拒絕)
+  await save(session);
   return { ok: true, session };
 }
 
@@ -151,7 +247,7 @@ export function declineHunt(
 export async function startCombat(
   sessionId: string,
 ): Promise<{ ok: true; session: HuntSession } | { ok: false; reason: string }> {
-  const session = sessions.get(sessionId);
+  const session = await load(sessionId);
   if (!session) return { ok: false, reason: '找不到此狩獵' };
   if (session.status !== 'pending') return { ok: false, reason: '已經開始了' };
 
@@ -189,13 +285,7 @@ export async function startCombat(
   session.partyMaxHp = partyMaxHp;
   session.partyHp = partyMaxHp;
 
-  // 抽 10 隻怪。怪物數值(monsters.ts)以 solo 為基準設計。
-  //
-  // 多人時「只放大怪物 HP」(2人×1.8, 3人×2.5),ATK/DEF 維持基礎值:
-  //   - party ATK 隨人數疊加(總和)→ 殺得動更肉的怪
-  //   - party HP 隨人數疊加(總和)→ 撐得住
-  //   - party DEF 取「平均」不隨人數疊加 → 若放大怪物 ATK 會讓多人被秒,故不放大 ATK
-  // XP/gold 保持基礎,獎勵倍率(rewardMult)在結算時才套用。
+  // 抽 10 隻怪。多人時「只放大怪物 HP」(2人×1.8, 3人×2.5),ATK/DEF 維持基礎值。
   const hpMult = session.difficultyMult; // 1 / 1.8 / 2.5,只作用在 HP
   session.monsters = sampleMonsters(session.region, HUNT_MONSTER_COUNT).map((m) => ({
     ...m,
@@ -204,6 +294,7 @@ export async function startCombat(
   session.status = 'in_progress';
 
   fightNext(session); // 打第一隻
+  await save(session);
   return { ok: true, session };
 }
 
@@ -223,13 +314,14 @@ function fightNext(session: HuntSession): EncounterResult {
   return encounter;
 }
 
-export function continueHunt(
+export async function continueHunt(
   sessionId: string,
-): { ok: true; encounter: EncounterResult; session: HuntSession } | { ok: false; reason: string } {
-  const session = sessions.get(sessionId);
+): Promise<{ ok: true; encounter: EncounterResult; session: HuntSession } | { ok: false; reason: string }> {
+  const session = await load(sessionId);
   if (!session) return { ok: false, reason: '找不到此狩獵' };
   if (session.status !== 'in_progress') return { ok: false, reason: '狩獵已結束' };
   const encounter = fightNext(session);
+  await save(session);
   return { ok: true, encounter, session };
 }
 
@@ -238,7 +330,7 @@ export async function applyHeal(
   userId: string,
   potionId: string,
 ): Promise<{ ok: true; healed: number; potionName: string; session: HuntSession } | { ok: false; reason: string }> {
-  const session = sessions.get(sessionId);
+  const session = await load(sessionId);
   if (!session) return { ok: false, reason: '找不到此狩獵' };
   if (session.status !== 'in_progress') return { ok: false, reason: '狩獵已結束,不能補血' };
   if (!session.memberIds.includes(userId)) return { ok: false, reason: '你不在這個隊伍裡' };
@@ -252,6 +344,7 @@ export async function applyHeal(
   const healAmount = Math.floor((session.partyMaxHp * recipe.healPercent) / 100);
   const before = session.partyHp;
   session.partyHp = Math.min(session.partyMaxHp, session.partyHp + healAmount);
+  await save(session);
   return { ok: true, healed: session.partyHp - before, potionName: recipe.name, session };
 }
 
@@ -264,9 +357,9 @@ export interface HuntReward {
   levelUps: { userId: string; name: string; newLevel: number }[];
 }
 
-/** 結算並把獎勵分給 3 人(XP→主等級, gold)。回傳獎勵摘要並清掉 session。 */
+/** 結算並把獎勵分給隊員(XP→主等級, gold)。回傳獎勵摘要並刪掉 session。 */
 export async function finalizeHunt(sessionId: string): Promise<HuntReward | null> {
-  const session = sessions.get(sessionId);
+  const session = await load(sessionId);
   if (!session) return null;
 
   const killed = session.encounters.filter((e) => e.killed);
@@ -295,6 +388,6 @@ export async function finalizeHunt(sessionId: string): Promise<HuntReward | null
     }
   }
 
-  sessions.delete(sessionId);
+  await remove(sessionId);
   return { killedCount: killed.length, totalXp, totalGold, xpEach, goldEach, levelUps };
 }
