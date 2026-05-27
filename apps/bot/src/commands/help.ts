@@ -45,9 +45,10 @@ const SECTIONS: { name: string; commands: { cmd: string; desc: string }[] }[] = 
     ],
   },
   {
-    name: '🤝 社交',
+    name: '🤝 社交 / 競爭',
     commands: [
       { cmd: '/visit', desc: '拜訪好友,雙方各得 +20⚡(30 分 CD)' },
+      { cmd: '/leaderboard', desc: '排行榜(等級/金幣/農場/釣魚,全球或本伺服器)' },
     ],
   },
 ];
