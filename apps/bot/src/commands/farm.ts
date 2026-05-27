@@ -11,7 +11,7 @@ import {
   type StringSelectMenuInteraction,
 } from 'discord.js';
 import { settleEnergy } from '../lib/energy.js';
-import { getFarmState, plantCrop, harvestAll, getFarmingSkill } from '../lib/farm.js';
+import { getFarmState, plantCropAll, harvestAll, getFarmingSkill } from '../lib/farm.js';
 import { buildFarmEmbed } from '../lib/embeds.js';
 import { unlockedCrops } from '../lib/crops.js';
 
@@ -52,7 +52,7 @@ async function buildFarmUI(userId: string, notification?: string) {
   const unlocked = unlockedCrops(farmingSkill.level);
   const selectMenu = new StringSelectMenuBuilder()
     .setCustomId(SELECT_PLANT)
-    .setPlaceholder(hasEmpty ? '🌱 選擇要種的作物' : '🚫 沒有空田,先收成')
+    .setPlaceholder(hasEmpty ? '🌱 選作物 → 一鍵種滿所有空田' : '🚫 沒有空田,先收成')
     .setDisabled(!hasEmpty || unlocked.length === 0);
 
   if (unlocked.length > 0) {
@@ -158,13 +158,13 @@ export async function handleSelectMenu(
     return true;
   }
 
-  const result = await plantCrop(userId, cropId);
+  const result = await plantCropAll(userId, cropId);
 
   let notification: string;
   if (!result.ok) {
     notification = `⚠️ ${result.reason}`;
   } else {
-    notification = `🌱 種下了 ${result.crop.emoji} **${result.crop.name}** 在 ${result.plotIndex + 1} 號田`;
+    notification = `🌱 種下了 ${result.crop.emoji} **${result.crop.name}** × ${result.planted}(種滿 ${result.planted} 塊空田)`;
   }
 
   const ui = await buildFarmUI(userId, notification);

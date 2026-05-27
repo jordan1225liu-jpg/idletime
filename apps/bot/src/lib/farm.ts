@@ -116,6 +116,49 @@ export async function plantCrop(userId: string, cropId: string): Promise<PlantRe
   return { ok: true, plotIndex: emptyPlot.plotIndex, crop };
 }
 
+export type PlantAllResult =
+  | { ok: true; crop: Crop; planted: number }
+  | { ok: false; reason: string };
+
+/** 一鍵把選定作物種滿所有空田。檢查等級一次,然後 transaction 種下所有空田。 */
+export async function plantCropAll(userId: string, cropId: string): Promise<PlantAllResult> {
+  const crop = CROPS[cropId];
+  if (!crop) return { ok: false, reason: '未知作物' };
+
+  // 1. 檢查農場技能等級
+  const skill = await prisma.playerSkill.findUnique({
+    where: { userId_skillId: { userId, skillId: 'farming' } },
+  });
+  const farmingLevel = skill?.level ?? 1;
+  if (farmingLevel < crop.unlockLevel) {
+    return {
+      ok: false,
+      reason: `需要農場技能 Lv ${crop.unlockLevel} 才能種${crop.emoji}${crop.name}(你目前 Lv ${farmingLevel})`,
+    };
+  }
+
+  // 2. 找所有空田
+  const state = await getFarmState(userId);
+  const emptyPlots = state.filter((p) => p.status === 'empty');
+  if (emptyPlots.length === 0) {
+    return { ok: false, reason: '沒有空田!請先收成' };
+  }
+
+  // 3. 一次種滿(同一個 plantedAt,讓它們同步成熟)
+  const now = new Date();
+  await prisma.$transaction(
+    emptyPlots.map((plot) =>
+      prisma.farmPlot.upsert({
+        where: { userId_plotIndex: { userId, plotIndex: plot.plotIndex } },
+        create: { userId, plotIndex: plot.plotIndex, cropType: cropId, plantedAt: now },
+        update: { cropType: cropId, plantedAt: now },
+      }),
+    ),
+  );
+
+  return { ok: true, crop, planted: emptyPlots.length };
+}
+
 export interface HarvestResult {
   harvested: Array<{ crop: Crop; quantity: number }>;
   xpGained: number;
