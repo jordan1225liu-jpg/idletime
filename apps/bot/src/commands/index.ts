@@ -18,6 +18,7 @@ import * as fish from './fish.js';
 import * as shop from './shop.js';
 import * as equipment from './equipment.js';
 import * as brew from './brew.js';
+import * as hunt from './hunt.js';
 
 export interface Command {
   /** Slash command 定義(會被序列化送給 Discord 註冊)*/
@@ -46,4 +47,5 @@ export const commands: readonly Command[] = [
   shop as Command,
   equipment as Command,
   brew as Command,
+  hunt as Command,
 ];

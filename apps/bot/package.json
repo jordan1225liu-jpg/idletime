@@ -9,7 +9,7 @@
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx test/energy.test.ts && tsx test/crops.test.ts && tsx test/visit.test.ts && tsx test/fish.test.ts"
+    "test": "tsx test/energy.test.ts && tsx test/crops.test.ts && tsx test/visit.test.ts && tsx test/fish.test.ts && tsx test/combat.test.ts"
   },
   "dependencies": {
     "@idletime/db": "workspace:*",
