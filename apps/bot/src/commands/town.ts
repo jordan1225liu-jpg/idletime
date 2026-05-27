@@ -6,6 +6,7 @@ import {
 } from 'discord.js';
 import { COLORS } from '../lib/embeds.js';
 import { NPCS, TOWN_NAME } from '../lib/npcs.js';
+import { tryImage } from '../lib/assets.js';
 
 export const data = new SlashCommandBuilder()
   .setName('town')
@@ -29,5 +30,13 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   }
 
   embed.setFooter({ text: '更多居民會隨著小鎮成長而加入…' });
-  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+
+  const banner = tryImage('town');
+  if (banner) embed.setImage(banner.url);
+
+  await interaction.reply({
+    embeds: [embed],
+    files: banner?.files ?? [],
+    flags: MessageFlags.Ephemeral,
+  });
 }

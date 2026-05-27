@@ -10,6 +10,7 @@ import {
 } from 'discord.js';
 import { createCharacter, getCharacter } from '../lib/character.js';
 import { buildCharacterEmbed, buildPrologueEmbed, buildWelcomeEmbed } from '../lib/embeds.js';
+import { tryImage } from '../lib/assets.js';
 
 export const data = new SlashCommandBuilder()
   .setName('start')
@@ -95,8 +96,14 @@ export async function handleModalSubmit(
       guildName: guild.name,
     });
 
+    const prologue = buildPrologueEmbed(name);
+    const prologueImg = tryImage('prologue');
+    if (prologueImg) prologue.setImage(prologueImg.url);
+    const avatarUrl = interaction.user.displayAvatarURL({ size: 256 });
+
     await interaction.editReply({
-      embeds: [buildPrologueEmbed(name), buildWelcomeEmbed(name), buildCharacterEmbed(character)],
+      embeds: [prologue, buildWelcomeEmbed(name), buildCharacterEmbed(character, undefined, avatarUrl)],
+      files: prologueImg?.files ?? [],
     });
   } catch (error) {
     console.error('createCharacter failed:', error);

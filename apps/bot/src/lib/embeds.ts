@@ -75,6 +75,7 @@ export function formatDuration(seconds: number): string {
 export function buildCharacterEmbed(
   character: CharacterWithGuild,
   combat?: CombatStats | null,
+  avatarUrl?: string | null,
 ): EmbedBuilder {
   const needed = expForNextLevel(character.level);
   const progress = levelProgress(character.level, character.exp);
@@ -122,6 +123,8 @@ export function buildCharacterEmbed(
       },
     );
   }
+
+  if (avatarUrl) embed.setThumbnail(avatarUrl);
 
   return embed.setFooter({
     text: `加入於 ${new Date(character.createdAt).toLocaleDateString('zh-TW')}`,

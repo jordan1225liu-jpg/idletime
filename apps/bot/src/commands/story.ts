@@ -1,6 +1,7 @@
 import {
   SlashCommandBuilder,
   ActionRowBuilder,
+  AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
@@ -12,6 +13,7 @@ import { prisma } from '@idletime/db';
 import { getCharacter } from '../lib/character.js';
 import { COLORS, makeProgressBar } from '../lib/embeds.js';
 import { NPCS, TOWN_NAME } from '../lib/npcs.js';
+import { tryImage } from '../lib/assets.js';
 import {
   CAMPAIGN_STEPS,
   claimCurrentStep,
@@ -95,20 +97,31 @@ function claimRow(step: number): ActionRowBuilder<ButtonBuilder> {
   );
 }
 
-/** 算出目前要顯示的畫面(embed + 是否該給領取鈕)。 */
-async function renderCurrent(
-  userId: string,
-): Promise<{ embeds: EmbedBuilder[]; components: ActionRowBuilder<ButtonBuilder>[] }> {
+interface StoryView {
+  embeds: EmbedBuilder[];
+  components: ActionRowBuilder<ButtonBuilder>[];
+  files: AttachmentBuilder[];
+}
+
+/** 算出目前要顯示的畫面(embed + NPC 頭像 + 是否該給領取鈕)。 */
+async function renderCurrent(userId: string): Promise<StoryView> {
   const progress = await getOrCreateProgress(userId);
   if (progress.currentStep > TOTAL) {
-    return { embeds: [allDoneEmbed()], components: [] };
+    const embed = allDoneEmbed();
+    const img = tryImage('npcs/mayor');
+    if (img) embed.setThumbnail(img.url);
+    return { embeds: [embed], components: [], files: img?.files ?? [] };
   }
   const step = getStep(progress.currentStep)!;
   const status = await evaluateObjective(userId, step.objective);
   const rewardText = await resolveRewardText(step.reward);
+  const embed = stepEmbed(step, status, rewardText);
+  const img = tryImage(`npcs/${step.npc}`);
+  if (img) embed.setThumbnail(img.url);
   return {
-    embeds: [stepEmbed(step, status, rewardText)],
+    embeds: [embed],
     components: status.met ? [claimRow(step.step)] : [],
+    files: img?.files ?? [],
   };
 }
 
@@ -159,6 +172,6 @@ export async function handleButton(interaction: ButtonInteraction): Promise<bool
   if (!result.ok) {
     await interaction.followUp({ content: `⚠️ ${result.reason}`, flags: MessageFlags.Ephemeral });
   }
-  await interaction.editReply({ embeds, components: view.components });
+  await interaction.editReply({ embeds, components: view.components, files: view.files });
   return true;
 }

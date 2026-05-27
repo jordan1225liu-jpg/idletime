@@ -40,5 +40,6 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   }
 
   const combat = await computeCombatStats(interaction.user.id);
-  await interaction.reply({ embeds: [buildCharacterEmbed(character, combat)] });
+  const avatarUrl = interaction.user.displayAvatarURL({ size: 256 });
+  await interaction.reply({ embeds: [buildCharacterEmbed(character, combat, avatarUrl)] });
 }
