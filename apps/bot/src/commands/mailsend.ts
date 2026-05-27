@@ -2,7 +2,6 @@ import {
   SlashCommandBuilder,
   EmbedBuilder,
   MessageFlags,
-  PermissionFlagsBits,
   type ChatInputCommandInteraction,
   type AutocompleteInteraction,
 } from 'discord.js';
@@ -15,8 +14,8 @@ import { MAIL_EXPIRY_DAYS, sendBroadcastMail, type MailAttachment } from '../lib
 export const data = new SlashCommandBuilder()
   .setName('mailsend')
   .setDescription('📨 [管理員] 發送信件給全體玩家(文字 + 金幣 + 物品)')
-  // 只有 Discord 管理員看得到這個指令(真正權限以 DISCORD_OWNER_ID 為準)
-  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+  // 不綁 Discord 伺服器權限 —— 真正權限以 DISCORD_OWNER_ID 為準(見 execute 的 isAdmin)。
+  // 別人看得到也沒關係,按了會被擋下並提示「只有遊戲管理員可以發送信件」。
   .addStringOption((o) =>
     o.setName('title').setDescription('信件標題').setRequired(true).setMaxLength(200),
   )
