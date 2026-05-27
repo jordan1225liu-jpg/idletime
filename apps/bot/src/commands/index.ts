@@ -22,6 +22,8 @@ import * as equipment from './equipment.js';
 import * as brew from './brew.js';
 import * as hunt from './hunt.js';
 import * as leaderboard from './leaderboard.js';
+import * as mail from './mail.js';
+import * as mailsend from './mailsend.js';
 
 export interface Command {
   /** Slash command 定義(會被序列化送給 Discord 註冊)*/
@@ -54,4 +56,6 @@ export const commands: readonly Command[] = [
   hunt as Command,
   leaderboard as Command,
   quests as Command,
+  mail as Command,
+  mailsend as Command,
 ];

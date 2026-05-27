@@ -35,6 +35,7 @@ model User {
   visitsInitiated Visit[]     @relation("VisitInitiator")
   equipment      PlayerEquipment[]
   dailyQuests    DailyQuest[]
+  mailClaims     MailClaim[]
 
   @@map("users")
 }
@@ -255,4 +256,41 @@ model PlayerSkill {
   @@id([userId, skillId])
   @@index([userId])
   @@map("player_skills")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAILBOX (系統信箱 — admin 廣播給全體玩家)
+// ═══════════════════════════════════════════════════════════════
+
+/// 系統信件。目前皆為 admin 廣播給「全體玩家」:一封信 = 一個 row,
+/// 領取狀態存在 MailClaim(每人每封限領一次),新玩家也看得到尚未過期的信。
+/// attachments = JSON 陣列 [{ itemId, quantity }],itemId 必須對應 items 型錄。
+model Mail {
+  id          Int       @id @default(autoincrement())
+  title       String
+  body        String
+  gold        Int       @default(0)
+  attachments Json      @default("[]")
+  senderId    String?   @map("sender_id") // 寄件 admin 的 Discord ID(顯示用)
+  expiresAt   DateTime  @map("expires_at") // 超過此時間未領取就消失
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  claims MailClaim[]
+
+  @@index([expiresAt])
+  @@map("mails")
+}
+
+/// 玩家領取某封信的紀錄。複合主鍵保證「同一封信每人只能領一次」。
+model MailClaim {
+  mailId    Int      @map("mail_id")
+  userId    String   @map("user_id")
+  claimedAt DateTime @default(now()) @map("claimed_at")
+
+  mail Mail @relation(fields: [mailId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([mailId, userId])
+  @@index([userId])
+  @@map("mail_claims")
 }

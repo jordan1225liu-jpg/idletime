@@ -36,6 +36,7 @@ const SECTIONS: { name: string; commands: { cmd: string; desc: string }[] }[] = 
       { cmd: '/sell', desc: '賣物品換金幣(數量填 0 = 全賣)' },
       { cmd: '/brew', desc: '藥水鋪 — 用作物 + 金幣合成回血藥' },
       { cmd: '/shop', desc: '鐵匠鋪 — 買武器與護甲' },
+      { cmd: '/mail', desc: '信箱 — 領取系統/管理員寄來的金幣與物品' },
     ],
   },
   {
