@@ -1,5 +1,6 @@
 import { prisma } from '@idletime/db';
 import { grantEnergy } from './energy.js';
+import { progressQuests } from './quests.js';
 import type { CharacterWithGuild } from './character.js';
 
 /** 每次接受拜訪雙方各得多少體力 */
@@ -134,6 +135,9 @@ export async function acceptVisit(
   // 雙方各加體力(內部已 settle + cap at max)
   const initiatorResult = await grantEnergy(visit.initiatorId, VISIT_ENERGY_GAIN);
   const accepterResult = await grantEnergy(accepterId, VISIT_ENERGY_GAIN);
+
+  // 拜訪任務進度算給「發起人」(主動拜訪的那位)
+  await progressQuests(visit.initiatorId, 'visit', 1);
 
   return {
     ok: true,

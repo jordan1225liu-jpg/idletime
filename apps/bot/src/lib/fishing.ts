@@ -1,6 +1,7 @@
 import { prisma } from '@idletime/db';
 import { FISHING_COOLDOWN_MS, rollFish, type CatchResult } from './fish.js';
 import { addExp } from './leveling.js';
+import { progressQuests } from './quests.js';
 
 export type CastResult =
   | {
@@ -61,6 +62,8 @@ export async function castFish(userId: string): Promise<CastResult> {
       },
     });
   });
+
+  await progressQuests(userId, 'fish', 1);
 
   return {
     ok: true,

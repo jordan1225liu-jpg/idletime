@@ -16,6 +16,7 @@ import * as visit from './visit.js';
 import * as inventory from './inventory.js';
 import * as sell from './sell.js';
 import * as fish from './fish.js';
+import * as quests from './quests.js';
 import * as shop from './shop.js';
 import * as equipment from './equipment.js';
 import * as brew from './brew.js';
@@ -52,4 +53,5 @@ export const commands: readonly Command[] = [
   brew as Command,
   hunt as Command,
   leaderboard as Command,
+  quests as Command,
 ];

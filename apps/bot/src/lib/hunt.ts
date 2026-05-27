@@ -10,6 +10,7 @@ import {
   type Monster,
 } from './monsters.js';
 import { addCharacterExp } from './character.js';
+import { progressQuests } from './quests.js';
 import { consumePotion, POTION_BY_ID } from './potions.js';
 
 export const HUNT_ENERGY_COST = 5;
@@ -279,6 +280,7 @@ export async function finalizeHunt(sessionId: string): Promise<HuntReward | null
 
   const levelUps: { userId: string; name: string; newLevel: number }[] = [];
   for (const member of session.members) {
+    await progressQuests(member.userId, 'hunt', 1);
     if (xpEach > 0) {
       const result = await addCharacterExp(member.userId, xpEach);
       if (result.levelsGained > 0) {

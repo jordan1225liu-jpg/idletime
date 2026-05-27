@@ -1,6 +1,7 @@
 import { prisma } from '@idletime/db';
 import { CROPS, computeCropProgress, type Crop } from './crops.js';
 import { addExp } from './leveling.js';
+import { progressQuests } from './quests.js';
 
 export interface PlotState {
   plotIndex: number;
@@ -176,7 +177,7 @@ export async function harvestAll(userId: string): Promise<HarvestResult> {
     return { harvested: [], xpGained: 0, oldLevel: 0, newLevel: 0, levelsGained: 0 };
   }
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     // 取目前農場技能等級
     const skill = await tx.playerSkill.findUnique({
       where: { userId_skillId: { userId, skillId: 'farming' } },
@@ -228,6 +229,12 @@ export async function harvestAll(userId: string): Promise<HarvestResult> {
       levelsGained,
     };
   });
+
+  // 每日任務:收成作物數(總量)
+  const totalHarvested = result.harvested.reduce((s, h) => s + h.quantity, 0);
+  await progressQuests(userId, 'farm', totalHarvested);
+
+  return result;
 }
 
 /**

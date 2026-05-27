@@ -34,6 +34,7 @@ model User {
   visitsAsB      Visit[]      @relation("VisitUserB")
   visitsInitiated Visit[]     @relation("VisitInitiator")
   equipment      PlayerEquipment[]
+  dailyQuests    DailyQuest[]
 
   @@map("users")
 }
@@ -76,6 +77,26 @@ model PlayerEquipment {
   @@id([userId, itemId])
   @@index([userId, slotId])
   @@map("player_equipment")
+}
+
+/// 每日任務。questDate = UTC+8 的 YYYY-MM-DD,每天重置(產生新的)。
+/// type: 'visit' | 'farm' | 'fish' | 'hunt'。progress 由各動作累加,>= target 可領獎。
+model DailyQuest {
+  id         Int      @id @default(autoincrement())
+  userId     String   @map("user_id")
+  questDate  String   @map("quest_date")
+  type       String
+  target     Int
+  progress   Int      @default(0)
+  goldReward Int      @map("gold_reward")
+  xpReward   Int      @map("xp_reward")
+  claimed    Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, questDate])
+  @@map("daily_quests")
 }
 
 // ═══════════════════════════════════════════════════════════════
