@@ -39,7 +39,7 @@ async function buildEquipmentUI(userId: string, notification?: string) {
   const embed = new EmbedBuilder()
     .setColor(COLORS.PRIMARY)
     .setTitle(`⚔️ ${character.name} 的裝備`)
-    .setDescription(notification ?? '')
+    .setDescription(notification ?? '切換裝備來提升戰力 ⚔️🛡️')
     .addFields(
       {
         name: '🎽 已裝備',
