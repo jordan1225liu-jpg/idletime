@@ -15,6 +15,8 @@ import * as visit from './visit.js';
 import * as inventory from './inventory.js';
 import * as sell from './sell.js';
 import * as fish from './fish.js';
+import * as shop from './shop.js';
+import * as equipment from './equipment.js';
 
 export interface Command {
   /** Slash command 定義(會被序列化送給 Discord 註冊)*/
@@ -40,4 +42,6 @@ export const commands: readonly Command[] = [
   inventory as Command,
   sell as Command,
   fish as Command,
+  shop as Command,
+  equipment as Command,
 ];

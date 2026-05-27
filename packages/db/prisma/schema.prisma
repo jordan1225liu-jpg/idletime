@@ -33,6 +33,7 @@ model User {
   visitsAsA      Visit[]      @relation("VisitUserA")
   visitsAsB      Visit[]      @relation("VisitUserB")
   visitsInitiated Visit[]     @relation("VisitInitiator")
+  equipment      PlayerEquipment[]
 
   @@map("users")
 }
@@ -48,6 +49,8 @@ model Character {
   energyMax           Int       @default(100) @map("energy_max")
   energyLastSettledAt DateTime  @default(now()) @map("energy_last_settled_at")
   lastFishingAt       DateTime? @map("last_fishing_at") // /fish 1-minute CD tracking
+  baseAttack          Int       @default(10) @map("base_attack") // 裸拳 ATK,裝備另計
+  baseDefense         Int       @default(10) @map("base_defense") // 裸身 DEF,裝備另計
   activeGuildId       String?   @map("active_guild_id")
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
@@ -57,6 +60,22 @@ model Character {
 
   @@index([activeGuildId])
   @@map("characters")
+}
+
+/// 玩家裝備擁有 + 裝備狀態。slot 同時只能有一件 equipped=true。
+/// maxHealth 不存這(由角色等級即時算:100 + level×30)。
+model PlayerEquipment {
+  userId     String   @map("user_id")
+  itemId     String   @map("item_id") // 對應 EQUIPMENT catalog 的 id(weapon_xxx / armor_xxx)
+  slotId     String   @map("slot_id") // 'weapon' / 'armor'
+  equipped   Boolean  @default(false)
+  acquiredAt DateTime @default(now()) @map("acquired_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, itemId])
+  @@index([userId, slotId])
+  @@map("player_equipment")
 }
 
 // ═══════════════════════════════════════════════════════════════

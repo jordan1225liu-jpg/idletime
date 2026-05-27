@@ -5,6 +5,7 @@ import {
 } from 'discord.js';
 import { ensureGuildContext } from '../lib/character.js';
 import { settleEnergy } from '../lib/energy.js';
+import { computeCombatStats } from '../lib/equipment.js';
 import { buildCharacterEmbed } from '../lib/embeds.js';
 
 export const data = new SlashCommandBuilder()
@@ -38,5 +39,6 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     character = (await settleEnergy(interaction.user.id)) ?? character;
   }
 
-  await interaction.reply({ embeds: [buildCharacterEmbed(character)] });
+  const combat = await computeCombatStats(interaction.user.id);
+  await interaction.reply({ embeds: [buildCharacterEmbed(character, combat)] });
 }

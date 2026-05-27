@@ -1,4 +1,5 @@
 import { prisma, type Character, type Guild } from '@idletime/db';
+import { addExp } from './leveling.js';
 
 /**
  * 8 個生活技能 ID,跟 GDD §5.1 一致。
@@ -89,6 +90,26 @@ export async function getCharacter(userId: string): Promise<CharacterWithGuild |
     where: { userId },
     include: { activeGuild: true },
   });
+}
+
+/**
+ * 加角色主等級 XP(來自 hunt 等)。角色等級只影響 maxHealth。
+ * 回傳升級資訊給呼叫端做慶祝顯示。
+ */
+export async function addCharacterExp(
+  userId: string,
+  amount: number,
+): Promise<{ oldLevel: number; newLevel: number; newExp: number; levelsGained: number }> {
+  const character = await prisma.character.findUnique({ where: { userId } });
+  if (!character) throw new Error(`No character for user ${userId}`);
+
+  const { level, exp, levelsGained } = addExp(character.level, character.exp, amount);
+  await prisma.character.update({
+    where: { userId },
+    data: { level, exp },
+  });
+
+  return { oldLevel: character.level, newLevel: level, newExp: exp, levelsGained };
 }
 
 /**

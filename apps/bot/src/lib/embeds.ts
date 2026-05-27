@@ -4,6 +4,7 @@ import { formatEnergyStatus } from './energy.js';
 import { unlockedCrops, nextLockedCrops } from './crops.js';
 import type { PlotState } from './farm.js';
 import type { CharacterWithGuild } from './character.js';
+import type { CombatStats } from './equipment.js';
 
 /**
  * 主題色,跟 STYLE_GUIDE.md §1 一致。
@@ -69,8 +70,11 @@ export function formatDuration(seconds: number): string {
   return `${d} 天 ${h % 24} 小時`;
 }
 
-/** 角色面板 embed(共用於 /me 與 /start) */
-export function buildCharacterEmbed(character: CharacterWithGuild): EmbedBuilder {
+/** 角色面板 embed(共用於 /me 與 /start)。傳入 combat 會多顯示戰力與裝備。 */
+export function buildCharacterEmbed(
+  character: CharacterWithGuild,
+  combat?: CombatStats | null,
+): EmbedBuilder {
   const needed = expForNextLevel(character.level);
   const progress = levelProgress(character.level, character.exp);
   const progressBar = makeProgressBar(progress);
@@ -79,7 +83,7 @@ export function buildCharacterEmbed(character: CharacterWithGuild): EmbedBuilder
     ? `📍 目前公會:**${character.activeGuild.name}**`
     : `📍 尚未加入任何公會`;
 
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setColor(COLORS.PRIMARY)
     .setTitle(`🛡️ ${character.name}`)
     .setDescription(guildLine)
@@ -99,10 +103,28 @@ export function buildCharacterEmbed(character: CharacterWithGuild): EmbedBuilder
         value: formatEnergyStatus(character),
         inline: true,
       },
-    )
-    .setFooter({
-      text: `加入於 ${new Date(character.createdAt).toLocaleDateString('zh-TW')}`,
-    });
+    );
+
+  if (combat) {
+    embed.addFields(
+      {
+        name: '💪 戰力',
+        value: `⚔️ ATK **${combat.attack.toLocaleString()}**\n🛡️ DEF **${combat.defense.toLocaleString()}**\n❤️ HP **${combat.maxHealth.toLocaleString()}**`,
+        inline: true,
+      },
+      {
+        name: '🎽 裝備',
+        value:
+          `${combat.weapon ? `${combat.weapon.emoji} ${combat.weapon.name}` : '🗡️ _無武器_'}\n` +
+          `${combat.armor ? `${combat.armor.emoji} ${combat.armor.name}` : '🛡️ _無護甲_'}`,
+        inline: true,
+      },
+    );
+  }
+
+  return embed.setFooter({
+    text: `加入於 ${new Date(character.createdAt).toLocaleDateString('zh-TW')}`,
+  });
 }
 
 /** 歡迎新玩家的 embed(/start 用) */
