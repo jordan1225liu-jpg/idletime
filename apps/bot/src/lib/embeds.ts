@@ -2,6 +2,7 @@ import { EmbedBuilder } from 'discord.js';
 import { expForNextLevel, levelProgress } from './leveling.js';
 import { formatEnergyStatus } from './energy.js';
 import { unlockedCrops, nextLockedCrops } from './crops.js';
+import { NPCS, TOWN_NAME } from './npcs.js';
 import type { PlotState } from './farm.js';
 import type { CharacterWithGuild } from './character.js';
 import type { CombatStats } from './equipment.js';
@@ -125,6 +126,35 @@ export function buildCharacterEmbed(
   return embed.setFooter({
     text: `加入於 ${new Date(character.createdAt).toLocaleDateString('zh-TW')}`,
   });
+}
+
+/**
+ * 序章 / 背景故事 embed(只在 /start 第一次建立角色時顯示)。
+ * 交代「為什麼來到灰燼谷」,並把鎮長帶出來銜接 /story 主線。
+ * 文字可自由修改;鎮長名與鎮名取自 npcs.ts,改那邊這裡會跟著變。
+ */
+export function buildPrologueEmbed(characterName: string): EmbedBuilder {
+  const mayor = NPCS.mayor;
+  return new EmbedBuilder()
+    .setColor(COLORS.PRIMARY)
+    .setTitle(`📖 序章 — 來到${TOWN_NAME}`)
+    .setDescription(
+      [
+        `很久以前,${TOWN_NAME}曾是邊境上最熱鬧的小鎮 —— 商隊絡繹、田野金黃、爐火徹夜不熄。`,
+        '',
+        '直到那場無人能說清的災厄。火光吞沒了一切,只留下滿地灰燼,和這個名字。',
+        '',
+        `多年後的一個清晨,一張被風吹得褪色的告示,落到了 **${characterName}** 的腳邊:`,
+        `> 「${TOWN_NAME}誠徵願意重新開始的人。」`,
+        '',
+        '你說不清自己為何而留 —— 也許是厭倦了漂泊,也許只是想找個地方,親手把什麼重新建立起來。',
+        '',
+        `當斷垣殘壁與一縷裊裊炊煙映入眼簾時,${mayor.title}${mayor.name}已經站在鎮口,等著你了。`,
+        '',
+        '你的故事,從這裡開始。',
+      ].join('\n'),
+    )
+    .setFooter({ text: '打 /story 跟著鎮長,展開重建灰燼谷的旅程 📜' });
 }
 
 /** 歡迎新玩家的 embed(/start 用) */

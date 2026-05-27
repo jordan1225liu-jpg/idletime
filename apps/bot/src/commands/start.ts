@@ -9,7 +9,7 @@ import {
   type ModalSubmitInteraction,
 } from 'discord.js';
 import { createCharacter, getCharacter } from '../lib/character.js';
-import { buildCharacterEmbed, buildWelcomeEmbed } from '../lib/embeds.js';
+import { buildCharacterEmbed, buildPrologueEmbed, buildWelcomeEmbed } from '../lib/embeds.js';
 
 export const data = new SlashCommandBuilder()
   .setName('start')
@@ -96,7 +96,7 @@ export async function handleModalSubmit(
     });
 
     await interaction.editReply({
-      embeds: [buildWelcomeEmbed(name), buildCharacterEmbed(character)],
+      embeds: [buildPrologueEmbed(name), buildWelcomeEmbed(name), buildCharacterEmbed(character)],
     });
   } catch (error) {
     console.error('createCharacter failed:', error);
