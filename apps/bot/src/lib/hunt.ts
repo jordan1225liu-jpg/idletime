@@ -187,21 +187,17 @@ export async function startCombat(
   session.partyMaxHp = partyMaxHp;
   session.partyHp = partyMaxHp;
 
-  // 抽 10 隻怪,依人數套用難度倍率(HP/ATK/DEF;XP/gold 保持基礎,獎勵倍率在結算時算)
+  // 抽 10 隻怪。怪物數值(monsters.ts)以 solo 為基準設計。
   //
-  // 重要:monsters.ts 的數值是以「3 人滿隊」設計的(party ATK = 三人總和)。
-  // difficultyMultiplier 在 3 人時 = 2.5,所以這裡除以 2.5 作為基準:
-  //   3 人 → 2.5/2.5 = ×1.0(原始設計數值)
-  //   2 人 → 1.8/2.5 = ×0.72
-  //   1 人 → 1.0/2.5 = ×0.4(solo 才打得動)
-  // 顯示用的 difficultyMult(1/1.8/2.5)維持不變,代表「相對 solo 的怪物強度」。
-  const MONSTER_TUNING_BASELINE = 2.5; // 怪物數值對應的滿難度(= 3 人)
-  const mult = session.difficultyMult / MONSTER_TUNING_BASELINE;
+  // 多人時「只放大怪物 HP」(2人×1.8, 3人×2.5),ATK/DEF 維持基礎值:
+  //   - party ATK 隨人數疊加(總和)→ 殺得動更肉的怪
+  //   - party HP 隨人數疊加(總和)→ 撐得住
+  //   - party DEF 取「平均」不隨人數疊加 → 若放大怪物 ATK 會讓多人被秒,故不放大 ATK
+  // XP/gold 保持基礎,獎勵倍率(rewardMult)在結算時才套用。
+  const hpMult = session.difficultyMult; // 1 / 1.8 / 2.5,只作用在 HP
   session.monsters = sampleMonsters(session.region, HUNT_MONSTER_COUNT).map((m) => ({
     ...m,
-    hp: Math.round(m.hp * mult),
-    attack: Math.round(m.attack * mult),
-    defense: Math.round(m.defense * mult),
+    hp: Math.round(m.hp * hpMult),
   }));
   session.status = 'in_progress';
 
