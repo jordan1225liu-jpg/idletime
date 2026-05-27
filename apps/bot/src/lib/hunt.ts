@@ -16,6 +16,16 @@ export const HUNT_ENERGY_COST = 5;
 export const HUNT_MONSTER_COUNT = 10;
 const SESSION_TTL_MS = 30 * 60 * 1000;
 
+/** 人數越多,怪物越強(套用在 HP/ATK/DEF)。index = partySize - 1 */
+export function difficultyMultiplier(partySize: number): number {
+  return [1, 1.8, 2.5][partySize - 1] ?? 1;
+}
+
+/** 人數越多,總獎勵越高(之後再 ÷ 人數分給每人)。index = partySize - 1 */
+export function rewardMultiplier(partySize: number): number {
+  return [1, 2.2, 3.8][partySize - 1] ?? 1;
+}
+
 export interface HuntMember {
   userId: string;
   name: string;
@@ -36,6 +46,9 @@ export interface HuntSession {
   memberIds: string[];
   accepted: Set<string>;
   declinedBy: string | null;
+  partySize: number;
+  difficultyMult: number;
+  rewardMult: number;
   // 戰鬥開始後填:
   members: HuntMember[];
   partyAttack: number;
@@ -76,10 +89,14 @@ export function createHuntSession(params: {
   if (!region) return { ok: false, reason: '未知地區' };
 
   const memberIds = [params.leaderId, ...params.partnerIds];
-  if (new Set(memberIds).size !== 3) {
-    return { ok: false, reason: '需要 3 個「不同」的玩家(你 + 2 個夥伴),且不能重複' };
+  if (new Set(memberIds).size !== memberIds.length) {
+    return { ok: false, reason: '隊員不能重複(包括你自己)' };
+  }
+  if (memberIds.length < 1 || memberIds.length > 3) {
+    return { ok: false, reason: '隊伍人數必須 1-3 人' };
   }
 
+  const partySize = memberIds.length;
   const session: HuntSession = {
     id: randomUUID().slice(0, 8),
     region,
@@ -87,6 +104,9 @@ export function createHuntSession(params: {
     memberIds,
     accepted: new Set([params.leaderId]), // 發起人自動接受
     declinedBy: null,
+    partySize,
+    difficultyMult: difficultyMultiplier(partySize),
+    rewardMult: rewardMultiplier(partySize),
     members: [],
     partyAttack: 0,
     partyDefense: 0,
@@ -111,7 +131,7 @@ export function acceptHunt(
   if (session.status !== 'pending') return { ok: false, reason: '這個狩獵已經開始或結束了' };
   if (!session.memberIds.includes(userId)) return { ok: false, reason: '你不在這個隊伍裡' };
   session.accepted.add(userId);
-  return { ok: true, allAccepted: session.accepted.size === 3, session };
+  return { ok: true, allAccepted: session.accepted.size === session.memberIds.length, session };
 }
 
 export function declineHunt(
@@ -163,10 +183,18 @@ export async function startCombat(
 
   session.members = members;
   session.partyAttack = partyAttack;
-  session.partyDefense = Math.floor(partyDefenseSum / 3);
+  session.partyDefense = Math.floor(partyDefenseSum / members.length);
   session.partyMaxHp = partyMaxHp;
   session.partyHp = partyMaxHp;
-  session.monsters = sampleMonsters(session.region, HUNT_MONSTER_COUNT);
+
+  // 抽 10 隻怪,依人數套用難度倍率(HP/ATK/DEF;XP/gold 保持基礎,獎勵倍率在結算時算)
+  const mult = session.difficultyMult;
+  session.monsters = sampleMonsters(session.region, HUNT_MONSTER_COUNT).map((m) => ({
+    ...m,
+    hp: Math.round(m.hp * mult),
+    attack: Math.round(m.attack * mult),
+    defense: Math.round(m.defense * mult),
+  }));
   session.status = 'in_progress';
 
   fightNext(session); // 打第一隻
@@ -236,10 +264,13 @@ export async function finalizeHunt(sessionId: string): Promise<HuntReward | null
   if (!session) return null;
 
   const killed = session.encounters.filter((e) => e.killed);
-  const totalXp = killed.reduce((s, e) => s + e.monster.xpReward, 0);
-  const totalGold = killed.reduce((s, e) => s + e.monster.goldReward, 0);
-  const xpEach = Math.floor(totalXp / 3);
-  const goldEach = Math.floor(totalGold / 3);
+  const baseXp = killed.reduce((s, e) => s + e.monster.xpReward, 0);
+  const baseGold = killed.reduce((s, e) => s + e.monster.goldReward, 0);
+  // 套用獎勵倍率(人數越多總量越高),再 ÷ 人數分給每人
+  const totalXp = Math.floor(baseXp * session.rewardMult);
+  const totalGold = Math.floor(baseGold * session.rewardMult);
+  const xpEach = Math.floor(totalXp / session.partySize);
+  const goldEach = Math.floor(totalGold / session.partySize);
 
   const levelUps: { userId: string; name: string; newLevel: number }[] = [];
   for (const member of session.members) {

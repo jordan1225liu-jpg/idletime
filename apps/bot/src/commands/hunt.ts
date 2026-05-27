@@ -33,9 +33,7 @@ import {
 
 export const data = new SlashCommandBuilder()
   .setName('hunt')
-  .setDescription('🏹 3 人組隊狩獵(每人 5 體力,隨機遇 10 隻怪)')
-  .addUserOption((o) => o.setName('partner1').setDescription('隊友 1').setRequired(true))
-  .addUserOption((o) => o.setName('partner2').setDescription('隊友 2').setRequired(true))
+  .setDescription('🏹 1-3 人組隊狩獵(每人 5 體力,隨機遇 10 隻怪)')
   .addStringOption((o) =>
     o
       .setName('region')
@@ -48,7 +46,9 @@ export const data = new SlashCommandBuilder()
         { name: '🐉 龍之巢穴 (Lv 61-80)', value: 'dragonlair' },
         { name: '⚡ 神之領域 (Lv 81-100)', value: 'divine' },
       ),
-  );
+  )
+  .addUserOption((o) => o.setName('partner1').setDescription('隊友 1(可選)').setRequired(false))
+  .addUserOption((o) => o.setName('partner2').setDescription('隊友 2(可選)').setRequired(false));
 
 const HUNT_PREFIX = 'hunt:';
 
@@ -64,8 +64,9 @@ function inviteEmbed(session: HuntSession): EmbedBuilder {
     .setTitle('🏹 狩獵邀請')
     .setDescription(
       `**${r.emoji} ${r.name}** (Lv ${r.minLevel}-${r.maxLevel}, 建議裝備 ${r.recommendedTier})\n\n` +
+        `👥 ${session.partySize} 人隊伍 → 怪物難度 **×${session.difficultyMult}**,獎勵 **×${session.rewardMult}**\n` +
         `⚠️ 每人消耗 **${HUNT_ENERGY_COST} 體力**,隨機遭遇 ${HUNT_MONSTER_COUNT} 隻怪物。\n` +
-        `兩位隊友都按「接受」就開打。\n\n` +
+        `所有隊友都按「接受」就開打。\n\n` +
         accepted.join('\n'),
     );
 }
@@ -112,7 +113,8 @@ function combatEmbed(session: HuntSession): EmbedBuilder {
     .setColor(session.status === 'defeated' ? COLORS.RED : COLORS.GREEN)
     .setTitle(`🏹 ${r.emoji} ${r.name} 狩獵中 (${session.currentIndex}/${HUNT_MONSTER_COUNT})`)
     .setDescription(
-      `⚔️ ATK ${session.partyAttack.toLocaleString()} · 🛡️ DEF ${session.partyDefense.toLocaleString()}\n` +
+      `👥 ${session.partySize} 人(難度 ×${session.difficultyMult} · 獎勵 ×${session.rewardMult})\n` +
+        `⚔️ ATK ${session.partyAttack.toLocaleString()} · 🛡️ DEF ${session.partyDefense.toLocaleString()}\n` +
         `❤️ ${hpBar} ${session.partyHp.toLocaleString()}/${session.partyMaxHp.toLocaleString()}`,
     );
 
@@ -176,7 +178,7 @@ function rewardEmbed(session: HuntSession, reward: NonNullable<Awaited<ReturnTyp
     )
     .addFields(
       {
-        name: '🎁 戰利品(每人均分)',
+        name: `🎁 戰利品(${session.partySize} 人 ×${session.rewardMult},每人均分)`,
         value: `+${reward.xpEach.toLocaleString()} XP(主等級)\n+${reward.goldEach.toLocaleString()}💰`,
         inline: false,
       },
@@ -202,11 +204,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  const p1 = interaction.options.getUser('partner1', true);
-  const p2 = interaction.options.getUser('partner2', true);
   const regionId = interaction.options.getString('region', true);
+  const rawPartners = [
+    interaction.options.getUser('partner1'),
+    interaction.options.getUser('partner2'),
+  ];
+  const partners = rawPartners.filter((u): u is NonNullable<typeof u> => u !== null);
 
-  if (p1.bot || p2.bot) {
+  if (partners.some((p) => p.bot)) {
     await interaction.reply({ content: '🤖 不能找 bot 組隊', flags: MessageFlags.Ephemeral });
     return;
   }
@@ -219,7 +224,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   const created = createHuntSession({
     leaderId: interaction.user.id,
-    partnerIds: [p1.id, p2.id],
+    partnerIds: partners.map((p) => p.id),
     regionId,
   });
   if (!created.ok) {
@@ -228,11 +233,34 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   }
 
   const session = created.session;
+
+  // 單人:不用邀請,直接開打
+  if (session.memberIds.length === 1) {
+    const combat = await startCombat(session.id);
+    if (!combat.ok) {
+      cancelHunt(session.id);
+      await interaction.reply({ content: `⚠️ ${combat.reason}`, flags: MessageFlags.Ephemeral });
+      return;
+    }
+    const s = combat.session;
+    if (s.status === 'in_progress') {
+      await interaction.reply({ embeds: [combatEmbed(s)], components: combatComponents(s.id) });
+    } else {
+      const reward = await finalizeHunt(s.id);
+      await interaction.reply({
+        embeds: reward ? [rewardEmbed(s, reward)] : [combatEmbed(s)],
+        components: [],
+      });
+    }
+    return;
+  }
+
+  // 多人:發邀請給隊友
   await interaction.reply({
-    content: `<@${p1.id}> <@${p2.id}>`,
+    content: partners.map((p) => `<@${p.id}>`).join(' '),
     embeds: [inviteEmbed(session)],
     components: inviteComponents(session.id),
-    allowedMentions: { users: [p1.id, p2.id] },
+    allowedMentions: { users: partners.map((p) => p.id) },
   });
 }
 
