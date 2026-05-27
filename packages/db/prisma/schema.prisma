@@ -51,6 +51,7 @@ model Character {
   energyMax           Int       @default(100) @map("energy_max")
   energyLastSettledAt DateTime  @default(now()) @map("energy_last_settled_at")
   lastFishingAt       DateTime? @map("last_fishing_at") // /fish 1-minute CD tracking
+  mailNotifiedAt      DateTime? @map("mail_notified_at") // 上次「有新信」私訊通知時間(節流:同一波信只私訊一次)
   baseAttack          Int       @default(10) @map("base_attack") // 裸拳 ATK,裝備另計
   baseDefense         Int       @default(10) @map("base_defense") // 裸身 DEF,裝備另計
   activeGuildId       String?   @map("active_guild_id")

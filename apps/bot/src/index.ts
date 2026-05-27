@@ -9,6 +9,10 @@ import {
 } from 'discord.js';
 import { env, isDev } from './lib/env.js';
 import { commands, type Command } from './commands/index.js';
+import { notifyUnreadMail } from './lib/mailNotify.js';
+
+/** 這些指令執行後不提示未讀信件(自己就是信箱 / 純工具 / 管理指令)。 */
+const MAIL_NOTIFY_SKIP = new Set(['mail', 'mailsend', 'help', 'ping']);
 
 // ─── 指令查找表 ────────────────────────────────────────────────
 const commandMap = new Collection<string, Command>();
@@ -118,6 +122,10 @@ client.on('interactionCreate', async (interaction) => {
         return;
       }
       await command.execute(interaction);
+      // 動作完成後:有未讀信件就提示(頻道 ephemeral + 每波一次私訊)
+      if (!MAIL_NOTIFY_SKIP.has(interaction.commandName)) {
+        await notifyUnreadMail(interaction);
+      }
       return;
     }
 

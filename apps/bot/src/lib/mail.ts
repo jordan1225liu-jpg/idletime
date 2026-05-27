@@ -178,6 +178,28 @@ export async function countInboxMails(userId: string): Promise<number> {
   });
 }
 
+/**
+ * 未讀信摘要(給「動作後提示」用):未讀封數 + 最新一封未讀信的建立時間。
+ * newestAt 用來跟 Character.mailNotifiedAt 比較,決定要不要再私訊一次(同一波只私訊一次)。
+ * count = 0 時不再多查 newestAt(省一次 query)。
+ */
+export async function getUnreadSummary(
+  userId: string,
+): Promise<{ count: number; newestAt: Date | null }> {
+  const where: Prisma.MailWhereInput = {
+    expiresAt: { gt: new Date() },
+    claims: { none: { userId } },
+  };
+  const count = await prisma.mail.count({ where });
+  if (count === 0) return { count: 0, newestAt: null };
+  const newest = await prisma.mail.findFirst({
+    where,
+    orderBy: { createdAt: 'desc' },
+    select: { createdAt: true },
+  });
+  return { count, newestAt: newest?.createdAt ?? null };
+}
+
 // ─── 玩家:領取 ───────────────────────────────────────────────
 
 export type ClaimResult =
