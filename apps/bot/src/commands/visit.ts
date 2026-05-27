@@ -84,9 +84,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     .setColor(COLORS.GOLD)
     .setTitle('🌿 拜訪邀請')
     .setDescription(
-      `<@${interaction.user.id}> 想要拜訪 <@${target.id}>!\n\n` +
-        `✨ 接受後雙方各得 **+${VISIT_ENERGY_GAIN}⚡ 體力**\n` +
-        `⏳ 邀請 30 分鐘內有效 · 同一位玩家每天只能拜訪 1 次(其他玩家不限)`,
+      `<@${interaction.user.id}> 想拜訪 <@${target.id}>!\n\n` +
+        `<@${target.id}> 點下方「✨ 接受拜訪」→ 雙方各得 **+${VISIT_ENERGY_GAIN}⚡ 體力**\n` +
+        `🕐 邀請 30 分鐘內有效\n` +
+        `📅 同一位玩家每天 1 次(拜訪其他玩家不受限)`,
     );
 
   const buttons = new ActionRowBuilder<ButtonBuilder>().addComponents(
