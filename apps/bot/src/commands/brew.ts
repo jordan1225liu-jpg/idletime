@@ -9,16 +9,23 @@ import {
   type StringSelectMenuInteraction,
 } from 'discord.js';
 import { prisma } from '@idletime/db';
-import { POTIONS, brewPotion } from '../lib/potions.js';
+import { POTIONS, brewPotion, maxBrewable } from '../lib/potions.js';
 import { COLORS } from '../lib/embeds.js';
 
 export const data = new SlashCommandBuilder()
   .setName('brew')
-  .setDescription('🧪 藥水鋪 — 用作物 + 金幣合成回血藥');
+  .setDescription('🧪 藥水鋪 — 用作物 + 金幣合成回血藥')
+  .addIntegerOption((o) =>
+    o
+      .setName('quantity')
+      .setDescription('一次做幾個(預設 1,填 0 = 做最多)')
+      .setRequired(false)
+      .setMinValue(0),
+  );
 
 const SELECT_BREW = 'brew:craft';
 
-async function buildBrewUI(userId: string, notification?: string) {
+async function buildBrewUI(userId: string, quantity: number, notification?: string) {
   const character = await prisma.character.findUnique({ where: { userId } });
   if (!character) return null;
 
@@ -62,9 +69,11 @@ async function buildBrewUI(userId: string, notification?: string) {
   }
 
   // select menu: 列出所有藥水(可做的標 ✅,不可做的選了會給錯誤訊息)
+  // quantity 編進 customId,讓選藥水後知道要做幾個
+  const qtyLabel = quantity === 0 ? '做最多' : `一次做 ${quantity} 個`;
   const menu = new StringSelectMenuBuilder()
-    .setCustomId(SELECT_BREW)
-    .setPlaceholder('🧪 選擇要合成的藥水(做 1 個)');
+    .setCustomId(`${SELECT_BREW}:${quantity}`)
+    .setPlaceholder(`🧪 選藥水 → ${qtyLabel}`);
   for (const p of POTIONS) {
     const can = craftable.includes(p.itemId);
     menu.addOptions(
@@ -81,7 +90,8 @@ async function buildBrewUI(userId: string, notification?: string) {
 }
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  const ui = await buildBrewUI(interaction.user.id);
+  const quantity = interaction.options.getInteger('quantity') ?? 1;
+  const ui = await buildBrewUI(interaction.user.id, quantity);
   if (!ui) {
     await interaction.reply({
       content: '你還沒建立角色!用 `/start` 開始遊戲。',
@@ -95,7 +105,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 export async function handleSelectMenu(
   interaction: StringSelectMenuInteraction,
 ): Promise<boolean> {
-  if (interaction.customId !== SELECT_BREW) return false;
+  if (!interaction.customId.startsWith(SELECT_BREW)) return false;
+
+  // 從 customId 取出批量(brew:craft:<quantity>)
+  let quantity = Number.parseInt(interaction.customId.split(':')[2] ?? '1', 10);
+  if (Number.isNaN(quantity) || quantity < 0) quantity = 1;
 
   const potionId = interaction.values[0];
   if (!potionId) {
@@ -103,12 +117,25 @@ export async function handleSelectMenu(
     return true;
   }
 
-  const result = await brewPotion(interaction.user.id, potionId, 1);
+  const userId = interaction.user.id;
+
+  // quantity 0 = 做最多
+  let qtyToMake = quantity;
+  if (quantity === 0) {
+    qtyToMake = await maxBrewable(userId, potionId);
+    if (qtyToMake < 1) {
+      const ui = await buildBrewUI(userId, quantity, '⚠️ 材料 / 金幣不足,一個都做不出來');
+      if (ui) await interaction.update({ embeds: [ui.embed], components: ui.components });
+      return true;
+    }
+  }
+
+  const result = await brewPotion(userId, potionId, qtyToMake);
   const notification = result.ok
     ? `✅ 合成 ${result.potion.emoji} **${result.potion.name}** × ${result.quantity}!剩餘金幣 ${result.goldAfter.toLocaleString()}💰`
     : `⚠️ ${result.reason}`;
 
-  const ui = await buildBrewUI(interaction.user.id, notification);
+  const ui = await buildBrewUI(userId, quantity, notification);
   if (ui) await interaction.update({ embeds: [ui.embed], components: ui.components });
   return true;
 }

@@ -140,6 +140,24 @@ export async function brewPotion(
   return { ok: true, potion: recipe, quantity, goldAfter: updated.gold };
 }
 
+/** 算這個藥水最多能做幾個(受金幣與每樣材料限制)。用於「做最多」。 */
+export async function maxBrewable(userId: string, potionId: string): Promise<number> {
+  const recipe = POTION_BY_ID[potionId];
+  if (!recipe) return 0;
+  const character = await prisma.character.findUnique({ where: { userId } });
+  if (!character) return 0;
+
+  let max = recipe.goldCost > 0 ? Math.floor(character.gold / recipe.goldCost) : Number.MAX_SAFE_INTEGER;
+  for (const ing of recipe.ingredients) {
+    const inv = await prisma.inventoryItem.findUnique({
+      where: { userId_itemId: { userId, itemId: ing.itemId } },
+    });
+    const have = inv?.quantity ?? 0;
+    max = Math.min(max, Math.floor(have / ing.quantity));
+  }
+  return Math.max(0, max === Number.MAX_SAFE_INTEGER ? 0 : max);
+}
+
 /** 玩家持有的藥水(給 hunt 補血用)*/
 export async function getPotionInventory(
   userId: string,
