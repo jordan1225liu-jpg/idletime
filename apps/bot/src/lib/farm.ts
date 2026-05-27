@@ -230,6 +230,26 @@ export async function harvestAll(userId: string): Promise<HarvestResult> {
   });
 }
 
+/**
+ * 剷除「生長中」的作物(種錯時立即移除,不給獎勵)。
+ * 只清生長中的,**不動已成熟的**(那些應該收成,有價值)。回傳剷除了幾塊。
+ */
+export async function clearFarm(userId: string): Promise<number> {
+  const state = await getFarmState(userId);
+  const growing = state.filter((p) => p.status === 'growing');
+  if (growing.length === 0) return 0;
+
+  await prisma.$transaction(
+    growing.map((p) =>
+      prisma.farmPlot.update({
+        where: { userId_plotIndex: { userId, plotIndex: p.plotIndex } },
+        data: { cropType: null, plantedAt: null },
+      }),
+    ),
+  );
+  return growing.length;
+}
+
 /** 取得農場技能(若不存在預設 Lv 1, 0 XP) */
 export async function getFarmingSkill(
   userId: string,

@@ -11,7 +11,7 @@ import {
   type StringSelectMenuInteraction,
 } from 'discord.js';
 import { settleEnergy } from '../lib/energy.js';
-import { getFarmState, plantCropAll, harvestAll, getFarmingSkill } from '../lib/farm.js';
+import { getFarmState, plantCropAll, harvestAll, clearFarm, getFarmingSkill } from '../lib/farm.js';
 import { buildFarmEmbed } from '../lib/embeds.js';
 import { unlockedCrops } from '../lib/crops.js';
 
@@ -21,6 +21,7 @@ export const data = new SlashCommandBuilder()
 
 const SELECT_PLANT = 'farm:plant-select';
 const BUTTON_HARVEST = 'farm:harvest';
+const BUTTON_CLEAR = 'farm:clear';
 const BUTTON_REFRESH = 'farm:refresh';
 const FARM_PREFIX = 'farm:';
 
@@ -47,6 +48,7 @@ async function buildFarmUI(userId: string, notification?: string) {
 
   const hasEmpty = plots.some((p) => p.status === 'empty');
   const hasReady = plots.some((p) => p.status === 'ready');
+  const hasGrowing = plots.some((p) => p.status === 'growing');
 
   // ─── Plant select menu ──────────────────────────────────────
   const unlocked = unlockedCrops(farmingSkill.level);
@@ -88,6 +90,12 @@ async function buildFarmUI(userId: string, notification?: string) {
       .setEmoji('🚜')
       .setStyle(ButtonStyle.Primary)
       .setDisabled(!hasReady),
+    new ButtonBuilder()
+      .setCustomId(BUTTON_CLEAR)
+      .setLabel('剷除生長中')
+      .setEmoji('🧹')
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(!hasGrowing),
     new ButtonBuilder()
       .setCustomId(BUTTON_REFRESH)
       .setLabel('刷新')
@@ -131,6 +139,17 @@ export async function handleButton(interaction: ButtonInteraction): Promise<bool
       }
     }
 
+    const ui = await buildFarmUI(userId, notification);
+    if (ui) await interaction.update({ embeds: [ui.embed], components: ui.components });
+    return true;
+  }
+
+  if (interaction.customId === BUTTON_CLEAR) {
+    const cleared = await clearFarm(userId);
+    const notification =
+      cleared > 0
+        ? `🧹 已剷除 ${cleared} 塊生長中的作物(無獎勵,可重新種植)`
+        : '⚠️ 沒有生長中的作物可剷除(已成熟的請用收成)';
     const ui = await buildFarmUI(userId, notification);
     if (ui) await interaction.update({ embeds: [ui.embed], components: ui.components });
     return true;
