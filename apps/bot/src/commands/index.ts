@@ -8,6 +8,7 @@ import type {
 } from 'discord.js';
 
 import * as ping from './ping.js';
+import * as help from './help.js';
 import * as start from './start.js';
 import * as me from './me.js';
 import * as farm from './farm.js';
@@ -37,6 +38,7 @@ export interface Command {
 
 export const commands: readonly Command[] = [
   ping as Command,
+  help as Command,
   start as Command,
   me as Command,
   farm as Command,
