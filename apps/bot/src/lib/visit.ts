@@ -5,8 +5,8 @@ import type { CharacterWithGuild } from './character.js';
 /** 每次接受拜訪雙方各得多少體力 */
 export const VISIT_ENERGY_GAIN = 20;
 
-/** per-pair 拜訪 CD(30 分鐘)*/
-export const VISIT_COOLDOWN_MS = 30 * 60 * 1000;
+/** per-pair 拜訪 CD:對同一位玩家 1 天(24 小時)只能拜訪 1 次 */
+export const VISIT_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 /** 邀請過期時間(發出後 30 分鐘沒人接就過期)*/
 export const VISIT_EXPIRES_MS = 30 * 60 * 1000;
@@ -47,7 +47,7 @@ export async function initiateVisit(
 
   const [a, b] = canonicalPair(visitorId, visiteeId);
 
-  // CD 檢查:最近 30 分鐘內有沒有 accepted 的拜訪
+  // CD 檢查:最近 24 小時內有沒有跟這位玩家完成過拜訪(1 天 1 次)
   const cdThreshold = new Date(Date.now() - VISIT_COOLDOWN_MS);
   const recentAccepted = await prisma.visit.findFirst({
     where: {
@@ -60,10 +60,11 @@ export async function initiateVisit(
 
   if (recentAccepted && recentAccepted.acceptedAt) {
     const remainingMs = recentAccepted.acceptedAt.getTime() + VISIT_COOLDOWN_MS - Date.now();
-    const minutes = Math.ceil(remainingMs / 60000);
+    const hours = Math.floor(remainingMs / 3_600_000);
+    const minutes = Math.ceil((remainingMs % 3_600_000) / 60_000);
     return {
       ok: false,
-      reason: `你跟對方還在拜訪 CD 中,${minutes} 分鐘後可再拜訪`,
+      reason: `你今天已經拜訪過這位玩家了,${hours} 小時 ${minutes} 分後可再拜訪(其他玩家不受影響)`,
     };
   }
 

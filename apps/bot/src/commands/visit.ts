@@ -21,7 +21,7 @@ import { COLORS } from '../lib/embeds.js';
 
 export const data = new SlashCommandBuilder()
   .setName('visit')
-  .setDescription('🤝 拜訪好友,接受後雙方各得 +20⚡ 體力(30 分鐘 CD)')
+  .setDescription('🤝 拜訪好友,接受後雙方各得 +20⚡ 體力(同一位玩家每天 1 次)')
   .addUserOption((opt) =>
     opt.setName('user').setDescription('要拜訪的玩家').setRequired(true),
   );
@@ -86,7 +86,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     .setDescription(
       `<@${interaction.user.id}> 想要拜訪 <@${target.id}>!\n\n` +
         `✨ 接受後雙方各得 **+${VISIT_ENERGY_GAIN}⚡ 體力**\n` +
-        `⏳ 邀請 30 分鐘內有效,接受後 30 分鐘才能再次拜訪同一人`,
+        `⏳ 邀請 30 分鐘內有效 · 同一位玩家每天只能拜訪 1 次(其他玩家不限)`,
     );
 
   const buttons = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -180,7 +180,7 @@ export async function handleButton(interaction: ButtonInteraction): Promise<bool
             visitee.energyMax,
             visiteeGain,
           ) +
-          `\n\n⏳ 這對玩家 30 分鐘後可再次拜訪`,
+          `\n\n⏳ 這兩位玩家明天才能再互相拜訪(每天 1 次)`,
       );
 
     await interaction.update({ content: '', embeds: [embed], components: [] });
