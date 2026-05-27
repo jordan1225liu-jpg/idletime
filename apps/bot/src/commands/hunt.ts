@@ -153,11 +153,12 @@ function combatEmbed(session: HuntSession): EmbedBuilder {
   return embed;
 }
 
-function combatComponents(sid: string): ActionRowBuilder<ButtonBuilder>[] {
+function combatComponents(session: HuntSession): ActionRowBuilder<ButtonBuilder>[] {
+  // 「繼續」帶上當下的 currentIndex → 重複點擊同一個按鈕不會重複打怪(見 continueHunt 的 guard)
   return [
     new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId(`${HUNT_PREFIX}continue:${sid}`).setLabel('繼續').setEmoji('▶️').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`${HUNT_PREFIX}heal:${sid}`).setLabel('喝藥水').setEmoji('💊').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`${HUNT_PREFIX}continue:${session.id}:${session.currentIndex}`).setLabel('繼續').setEmoji('▶️').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`${HUNT_PREFIX}heal:${session.id}`).setLabel('喝藥水').setEmoji('💊').setStyle(ButtonStyle.Success),
     ),
   ];
 }
@@ -274,7 +275,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     }
     const s = combat.session;
     if (s.status === 'in_progress') {
-      await interaction.editReply({ embeds: [combatEmbed(s)], components: combatComponents(s.id) });
+      await interaction.editReply({ embeds: [combatEmbed(s)], components: combatComponents(s) });
     } else {
       let reward: Awaited<ReturnType<typeof finalizeHunt>> = null;
       try {
@@ -363,9 +364,13 @@ export async function handleButton(interaction: ButtonInteraction): Promise<bool
 
   // ── 繼續 ──
   if (action === 'continue') {
-    const result = await continueHunt(sid);
+    // 先 ack(冷連線下 DB 讀寫可能 >3 秒,避免互動逾時讓玩家以為沒反應而重點)
+    await interaction.deferUpdate();
+    // customId 形如 hunt:continue:<sid>:<index>;index 用來防重複打同一隻
+    const expectedIndex = Number(rest.split(':')[2]);
+    const result = await continueHunt(sid, Number.isInteger(expectedIndex) ? expectedIndex : undefined);
     if (!result.ok) {
-      await interaction.reply({ content: `⚠️ ${result.reason}`, flags: MessageFlags.Ephemeral });
+      await interaction.followUp({ content: `⚠️ ${result.reason}`, flags: MessageFlags.Ephemeral });
       return true;
     }
     await showAfterFight(interaction, result.session, sid);
@@ -405,7 +410,7 @@ export async function handleButton(interaction: ButtonInteraction): Promise<bool
 
   // ── 取消補血 ──
   if (action === 'healcancel') {
-    await interaction.update({ embeds: [combatEmbed(session)], components: combatComponents(sid) });
+    await interaction.update({ embeds: [combatEmbed(session)], components: combatComponents(session) });
     return true;
   }
 
@@ -444,7 +449,7 @@ export async function handleSelectMenu(interaction: StringSelectMenuInteraction)
     value: `<@${clickerId}> 使用 **${result.potionName}** → 隊伍 HP +${result.healed.toLocaleString()}`,
     inline: false,
   });
-  await interaction.update({ embeds: [embed], components: combatComponents(sid) });
+  await interaction.update({ embeds: [embed], components: combatComponents(session) });
   return true;
 }
 
@@ -456,7 +461,7 @@ async function showAfterFight(
 ) {
   if (session.status === 'in_progress') {
     // 還在打:回合計算是純記憶體運算,可直接 update(若稍早已 defer 則改用 editReply)
-    const payload = { embeds: [combatEmbed(session)], components: combatComponents(sid) };
+    const payload = { embeds: [combatEmbed(session)], components: combatComponents(session) };
     if (interaction.deferred || interaction.replied) await interaction.editReply(payload);
     else await interaction.update(payload);
     return;

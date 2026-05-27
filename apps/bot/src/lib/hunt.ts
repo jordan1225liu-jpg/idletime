@@ -316,13 +316,22 @@ function fightNext(session: HuntSession): EncounterResult {
 
 export async function continueHunt(
   sessionId: string,
-): Promise<{ ok: true; encounter: EncounterResult; session: HuntSession } | { ok: false; reason: string }> {
+  expectedIndex?: number,
+): Promise<
+  | { ok: true; session: HuntSession; fought: boolean; encounter?: EncounterResult }
+  | { ok: false; reason: string }
+> {
   const session = await load(sessionId);
   if (!session) return { ok: false, reason: '找不到此狩獵' };
   if (session.status !== 'in_progress') return { ok: false, reason: '狩獵已結束' };
+  // 防連點 / 重複事件:「繼續」按鈕帶著當下的 currentIndex,
+  // 若 session 已經前進過(index 對不上)就不再重打,只回現況 → 一次點擊只打一隻。
+  if (expectedIndex !== undefined && session.currentIndex !== expectedIndex) {
+    return { ok: true, session, fought: false };
+  }
   const encounter = fightNext(session);
   await save(session);
-  return { ok: true, encounter, session };
+  return { ok: true, session, fought: true, encounter };
 }
 
 export async function applyHeal(
