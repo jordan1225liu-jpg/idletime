@@ -24,6 +24,8 @@ import * as hunt from './hunt.js';
 import * as leaderboard from './leaderboard.js';
 import * as mail from './mail.js';
 import * as mailsend from './mailsend.js';
+import * as story from './story.js';
+import * as town from './town.js';
 
 export interface Command {
   /** Slash command 定義(會被序列化送給 Discord 註冊)*/
@@ -58,4 +60,6 @@ export const commands: readonly Command[] = [
   quests as Command,
   mail as Command,
   mailsend as Command,
+  story as Command,
+  town as Command,
 ];

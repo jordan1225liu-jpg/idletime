@@ -33,9 +33,10 @@ model User {
   visitsAsA      Visit[]      @relation("VisitUserA")
   visitsAsB      Visit[]      @relation("VisitUserB")
   visitsInitiated Visit[]     @relation("VisitInitiator")
-  equipment      PlayerEquipment[]
-  dailyQuests    DailyQuest[]
-  mailClaims     MailClaim[]
+  equipment        PlayerEquipment[]
+  dailyQuests      DailyQuest[]
+  mailClaims       MailClaim[]
+  campaignProgress CampaignProgress?
 
   @@map("users")
 }
@@ -294,4 +295,21 @@ model MailClaim {
   @@id([mailId, userId])
   @@index([userId])
   @@map("mail_claims")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CAMPAIGN (主線劇情 — NPC 帶領的里程碑式任務鏈)
+// ═══════════════════════════════════════════════════════════════
+
+/// 玩家主線進度(每人一列)。currentStep = 目前進行到第幾章(1-based,對應
+/// lib/campaign.ts 的 CAMPAIGN_STEPS)。目標採「狀態檢查」即時判定,故不需存每章計數。
+model CampaignProgress {
+  userId      String    @id @map("user_id")
+  currentStep Int       @default(1) @map("current_step")
+  completedAt DateTime? @map("completed_at") // 全主線完成時間(null = 進行中)
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("campaign_progress")
 }

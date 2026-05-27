@@ -17,6 +17,8 @@ const SECTIONS: { name: string; commands: { cmd: string; desc: string }[] }[] = 
     commands: [
       { cmd: '/start', desc: '第一次玩,建立角色' },
       { cmd: '/me', desc: '角色面板:等級、金幣、體力、戰力、裝備' },
+      { cmd: '/story', desc: '主線劇情 — 跟著 NPC 重建小鎮、解鎖地區' },
+      { cmd: '/town', desc: '認識小鎮的居民(NPC)' },
       { cmd: '/quests', desc: '每日任務 — 完成領金幣 + 經驗(每天重置)' },
       { cmd: '/help', desc: '顯示這個指令列表' },
       { cmd: '/ping', desc: '檢查 bot 在線與延遲' },
