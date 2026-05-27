@@ -56,9 +56,18 @@ const CROPS: ItemSeed[] = [
   { id: 'goldwheat',  name: '黃金小麥', category: 'crop', emoji: '🌟',  description: '農場 Lv 100 神級作物,極稀有',     sellPrice: 28000 },
 ];
 
+// ─── 藥水(consumable;sellPrice 0 = 不可賣,只能用)──────────────
+const POTIONS: ItemSeed[] = [
+  { id: 'potion_minor',  name: '微量回血藥', category: 'consumable', emoji: '🧪', description: '戰鬥中回復 10% 最大生命', sellPrice: 0 },
+  { id: 'potion_small',  name: '小型回血藥', category: 'consumable', emoji: '🧪', description: '戰鬥中回復 25% 最大生命', sellPrice: 0 },
+  { id: 'potion_medium', name: '中型回血藥', category: 'consumable', emoji: '🧪', description: '戰鬥中回復 50% 最大生命', sellPrice: 0 },
+  { id: 'potion_large',  name: '大型回血藥', category: 'consumable', emoji: '🧪', description: '戰鬥中回復 75% 最大生命', sellPrice: 0 },
+  { id: 'potion_divine', name: '神級回血藥', category: 'consumable', emoji: '🧪', description: '戰鬥中回復 100% 最大生命', sellPrice: 0 },
+];
+
 async function main() {
-  const all = [...SEEDS, ...CROPS];
-  console.log(`🌱 開始 seed ${all.length} 個道具(${SEEDS.length} 種子 + ${CROPS.length} 作物)...`);
+  const all = [...SEEDS, ...CROPS, ...POTIONS];
+  console.log(`🌱 開始 seed ${all.length} 個道具(${SEEDS.length} 種子 + ${CROPS.length} 作物 + ${POTIONS.length} 藥水)...`);
 
   for (const item of all) {
     await prisma.item.upsert({
