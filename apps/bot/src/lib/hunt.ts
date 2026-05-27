@@ -182,7 +182,8 @@ export async function startCombat(
   }
 
   session.members = members;
-  session.partyAttack = partyAttack;
+  // ATK 與 DEF 都取「平均」(加總 ÷ 人數);HP 為加總
+  session.partyAttack = Math.floor(partyAttack / members.length);
   session.partyDefense = Math.floor(partyDefenseSum / members.length);
   session.partyMaxHp = partyMaxHp;
   session.partyHp = partyMaxHp;
