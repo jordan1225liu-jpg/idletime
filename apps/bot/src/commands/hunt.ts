@@ -198,6 +198,22 @@ function rewardEmbed(session: HuntSession, reward: NonNullable<Awaited<ReturnTyp
 
 // ─── Command handlers ──────────────────────────────────────────
 
+/** 按到失效的狩獵按鈕(session 已消失,通常因 bot 重啟)時:清掉按鈕 + 顯示已結束,避免一直噴錯誤 */
+async function expireHuntMessage(
+  interaction: ButtonInteraction | StringSelectMenuInteraction,
+): Promise<void> {
+  await interaction.update({
+    content: '',
+    embeds: [
+      new EmbedBuilder()
+        .setColor(COLORS.RED)
+        .setTitle('🏹 此狩獵已結束')
+        .setDescription('這場狩獵已過期(或 bot 更新重啟了)。請重新 `/hunt` 開始新的一場。'),
+    ],
+    components: [],
+  });
+}
+
 export async function execute(interaction: ChatInputCommandInteraction) {
   if (!interaction.guild) {
     await interaction.reply({ content: '⚠️ 請在伺服器中使用', flags: MessageFlags.Ephemeral });
@@ -236,18 +252,26 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   // 單人:不用邀請,直接開打
   if (session.memberIds.length === 1) {
+    // startCombat / finalizeHunt 會做多筆 DB 操作(冷連線可能 >3s),
+    // 先 defer 取得 ack,否則 reply 會逾時、畫面卡住。
+    await interaction.deferReply();
     const combat = await startCombat(session.id);
     if (!combat.ok) {
       cancelHunt(session.id);
-      await interaction.reply({ content: `⚠️ ${combat.reason}`, flags: MessageFlags.Ephemeral });
+      await interaction.editReply({ content: `⚠️ ${combat.reason}` });
       return;
     }
     const s = combat.session;
     if (s.status === 'in_progress') {
-      await interaction.reply({ embeds: [combatEmbed(s)], components: combatComponents(s.id) });
+      await interaction.editReply({ embeds: [combatEmbed(s)], components: combatComponents(s.id) });
     } else {
-      const reward = await finalizeHunt(s.id);
-      await interaction.reply({
+      let reward: Awaited<ReturnType<typeof finalizeHunt>> = null;
+      try {
+        reward = await finalizeHunt(s.id);
+      } catch (err) {
+        console.error('❌ finalizeHunt 失敗:', err);
+      }
+      await interaction.editReply({
         embeds: reward ? [rewardEmbed(s, reward)] : [combatEmbed(s)],
         components: [],
       });
@@ -283,11 +307,13 @@ export async function handleButton(interaction: ButtonInteraction): Promise<bool
       await interaction.update({ embeds: [inviteEmbed(result.session)], components: inviteComponents(sid) });
       return true;
     }
-    // 全員接受 → 開戰
+    // 全員接受 → 開戰。startCombat 會做多筆 DB 操作(冷連線可能 >3s),
+    // 先 deferUpdate 取得 ack(不顯示 loading),避免互動逾時。
+    await interaction.deferUpdate();
     const combat = await startCombat(sid);
     if (!combat.ok) {
       cancelHunt(sid);
-      await interaction.update({
+      await interaction.editReply({
         embeds: [new EmbedBuilder().setColor(COLORS.RED).setTitle('🏹 狩獵取消').setDescription(`⚠️ ${combat.reason}`)],
         components: [],
       });
@@ -315,7 +341,8 @@ export async function handleButton(interaction: ButtonInteraction): Promise<bool
   // 以下 action 需要是隊員
   const session = getSession(sid);
   if (!session) {
-    await interaction.reply({ content: '⚠️ 找不到此狩獵(可能已過期)', flags: MessageFlags.Ephemeral });
+    // session 不在記憶體(多半是 bot 重啟或已過期)→ 清掉死按鈕,別再一直噴錯
+    await expireHuntMessage(interaction);
     return true;
   }
   if (!session.memberIds.includes(userId)) {
@@ -417,14 +444,24 @@ async function showAfterFight(
   sid: string,
 ) {
   if (session.status === 'in_progress') {
-    await interaction.update({ embeds: [combatEmbed(session)], components: combatComponents(sid) });
+    // 還在打:回合計算是純記憶體運算,可直接 update(若稍早已 defer 則改用 editReply)
+    const payload = { embeds: [combatEmbed(session)], components: combatComponents(sid) };
+    if (interaction.deferred || interaction.replied) await interaction.editReply(payload);
+    else await interaction.update(payload);
     return;
   }
-  // completed 或 defeated → 結算
-  const reward = await finalizeHunt(sid);
-  if (!reward) {
-    await interaction.update({ embeds: [combatEmbed(session)], components: [] });
-    return;
+  // completed 或 defeated → 結算。finalizeHunt 會做多筆 DB 寫入(冷連線可能 >3s),
+  // 先 deferUpdate 取得 ack 避免互動逾時 —— 否則血量歸 0 的結算畫面不會出現,
+  // 會卡在最後一隻怪的戰況、而 session 又已被刪除,再按就變「找不到此狩獵」。
+  if (!interaction.deferred && !interaction.replied) await interaction.deferUpdate();
+  let reward: Awaited<ReturnType<typeof finalizeHunt>> = null;
+  try {
+    reward = await finalizeHunt(sid);
+  } catch (err) {
+    console.error('❌ finalizeHunt 失敗:', err);
   }
-  await interaction.update({ embeds: [rewardEmbed(session, reward)], components: [] });
+  await interaction.editReply({
+    embeds: reward ? [rewardEmbed(session, reward)] : [combatEmbed(session)],
+    components: [],
+  });
 }
