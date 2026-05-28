@@ -136,7 +136,7 @@ function combatEmbed(session: HuntSession): EmbedBuilder {
     embed.addFields({ name: '📜 戰況', value: summary.slice(0, 1024), inline: false });
   }
 
-  // 下一隻預告
+  // 下一隻預告 + 底部大圖(讓玩家看清楚接下來要面對的怪物)
   if (session.status === 'in_progress' && session.currentIndex < session.monsters.length) {
     const next = session.monsters[session.currentIndex]!;
     embed.addFields({
@@ -144,11 +144,9 @@ function combatEmbed(session: HuntSession): EmbedBuilder {
       value: `${next.emoji} **${next.name}** — HP ${next.hp.toLocaleString()} · ATK ${next.attack.toLocaleString()} · DEF ${next.defense.toLocaleString()}`,
       inline: false,
     });
+    const nextImg = assetUrl(`monsters/${next.id}`);
+    if (nextImg) embed.setImage(nextImg);
   }
-
-  // 右上角放「剛交手的那隻怪」的圖(用網址,避免每回合重傳附件)
-  const monsterImg = last ? assetUrl(`monsters/${last.monster.id}`) : null;
-  if (monsterImg) embed.setThumbnail(monsterImg);
 
   return embed;
 }
