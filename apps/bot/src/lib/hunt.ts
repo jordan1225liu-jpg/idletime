@@ -154,9 +154,9 @@ async function load(id: string): Promise<HuntSession | undefined> {
 }
 
 async function remove(id: string): Promise<void> {
-  await prisma.huntSession.delete({ where: { id } }).catch(() => {
-    /* 已不存在就忽略 */
-  });
+  // 用 deleteMany 避免 record-not-found 時 Prisma 在 log 印紅字噪音
+  // (功能上等價:不存在就 count=0,不丟例外)
+  await prisma.huntSession.deleteMany({ where: { id } });
 }
 
 async function sweepExpired(): Promise<void> {

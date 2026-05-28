@@ -112,16 +112,15 @@ export async function handleSelectMenu(
   interaction: StringSelectMenuInteraction,
 ): Promise<boolean> {
   if (!interaction.customId.startsWith(SELECT_BREW)) return false;
+  // 先 ack(brewPotion / maxBrewable / buildBrewUI 都會打 DB,冷連線可能 >3 秒)
+  await interaction.deferUpdate();
 
   // 從 customId 取出批量(brew:craft:<quantity>)
   let quantity = Number.parseInt(interaction.customId.split(':')[2] ?? '1', 10);
   if (Number.isNaN(quantity) || quantity < 0) quantity = 1;
 
   const potionId = interaction.values[0];
-  if (!potionId) {
-    await interaction.deferUpdate();
-    return true;
-  }
+  if (!potionId) return true;
 
   const userId = interaction.user.id;
 
@@ -131,7 +130,7 @@ export async function handleSelectMenu(
     qtyToMake = await maxBrewable(userId, potionId);
     if (qtyToMake < 1) {
       const ui = await buildBrewUI(userId, quantity, '⚠️ 材料 / 金幣不足,一個都做不出來');
-      if (ui) await interaction.update({ embeds: [ui.embed], components: ui.components });
+      if (ui) await interaction.editReply({ embeds: [ui.embed], components: ui.components });
       return true;
     }
   }
@@ -142,6 +141,6 @@ export async function handleSelectMenu(
     : `⚠️ ${result.reason}`;
 
   const ui = await buildBrewUI(userId, quantity, notification);
-  if (ui) await interaction.update({ embeds: [ui.embed], components: ui.components });
+  if (ui) await interaction.editReply({ embeds: [ui.embed], components: ui.components });
   return true;
 }

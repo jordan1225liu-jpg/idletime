@@ -127,6 +127,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 /** Button handler:處理 farm:harvest 與 farm:refresh */
 export async function handleButton(interaction: ButtonInteraction): Promise<boolean> {
   if (!interaction.customId.startsWith(FARM_PREFIX)) return false;
+  // 先 ack(收成/剷除/刷新都會做多筆 DB 操作,冷連線下可能 >3 秒)
+  await interaction.deferUpdate();
   const userId = interaction.user.id;
 
   if (interaction.customId === BUTTON_HARVEST) {
@@ -146,7 +148,7 @@ export async function handleButton(interaction: ButtonInteraction): Promise<bool
     }
 
     const ui = await buildFarmUI(userId, notification);
-    if (ui) await interaction.update({ embeds: [ui.embed], components: ui.components });
+    if (ui) await interaction.editReply({ embeds: [ui.embed], components: ui.components });
     return true;
   }
 
@@ -157,13 +159,13 @@ export async function handleButton(interaction: ButtonInteraction): Promise<bool
         ? `🧹 已剷除 ${cleared} 塊生長中的作物(無獎勵,可重新種植)`
         : '⚠️ 沒有生長中的作物可剷除(已成熟的請用收成)';
     const ui = await buildFarmUI(userId, notification);
-    if (ui) await interaction.update({ embeds: [ui.embed], components: ui.components });
+    if (ui) await interaction.editReply({ embeds: [ui.embed], components: ui.components });
     return true;
   }
 
   if (interaction.customId === BUTTON_REFRESH) {
     const ui = await buildFarmUI(userId);
-    if (ui) await interaction.update({ embeds: [ui.embed], components: ui.components });
+    if (ui) await interaction.editReply({ embeds: [ui.embed], components: ui.components });
     return true;
   }
 
@@ -175,13 +177,12 @@ export async function handleSelectMenu(
   interaction: StringSelectMenuInteraction,
 ): Promise<boolean> {
   if (interaction.customId !== SELECT_PLANT) return false;
+  // 先 ack(plantCropAll 含 DB transaction,冷連線可能 >3 秒)
+  await interaction.deferUpdate();
   const userId = interaction.user.id;
   const cropId = interaction.values[0];
 
-  if (!cropId || cropId === '__none__') {
-    await interaction.deferUpdate();
-    return true;
-  }
+  if (!cropId || cropId === '__none__') return true;
 
   const result = await plantCropAll(userId, cropId);
 
@@ -193,6 +194,6 @@ export async function handleSelectMenu(
   }
 
   const ui = await buildFarmUI(userId, notification);
-  if (ui) await interaction.update({ embeds: [ui.embed], components: ui.components });
+  if (ui) await interaction.editReply({ embeds: [ui.embed], components: ui.components });
   return true;
 }

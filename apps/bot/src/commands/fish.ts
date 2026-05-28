@@ -133,9 +133,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 export async function handleButton(interaction: ButtonInteraction): Promise<boolean> {
   if (interaction.customId !== BUTTON_CAST) return false;
 
+  // 先 ack(castFish 在冷連線下可能 >3 秒,避免 Unknown interaction)
+  await interaction.deferUpdate();
   const result = await castFish(interaction.user.id);
 
-  await interaction.update({
+  await interaction.editReply({
     embeds: [withSceneArt(buildEmbed(result))],
     components: [buildButtons()],
   } satisfies InteractionEditReplyOptions);

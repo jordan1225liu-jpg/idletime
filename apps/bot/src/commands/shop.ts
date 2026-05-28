@@ -106,12 +106,11 @@ export async function handleSelectMenu(
   interaction: StringSelectMenuInteraction,
 ): Promise<boolean> {
   if (!interaction.customId.startsWith(SELECT_PREFIX)) return false;
+  // 先 ack(buyEquipment + buildShopUI 都會打 DB,冷連線可能 >3 秒)
+  await interaction.deferUpdate();
 
   const equipmentId = interaction.values[0];
-  if (!equipmentId) {
-    await interaction.deferUpdate();
-    return true;
-  }
+  if (!equipmentId) return true;
 
   const result = await buyEquipment(interaction.user.id, equipmentId);
   let notification: string;
@@ -125,6 +124,6 @@ export async function handleSelectMenu(
   }
 
   const ui = await buildShopUI(interaction.user.id, notification);
-  if (ui) await interaction.update({ embeds: [ui.embed], components: ui.components });
+  if (ui) await interaction.editReply({ embeds: [ui.embed], components: ui.components });
   return true;
 }
