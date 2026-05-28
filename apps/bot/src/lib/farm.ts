@@ -266,3 +266,135 @@ export async function getFarmingSkill(
   });
   return skill ?? { level: 1, exp: 0 };
 }
+
+// ─── 擴充田地(購買新田) ────────────────────────────────────────
+
+/** 初始田地數量(Farm schema 預設值,這裡作為購買起算的基準) */
+export const INITIAL_PLOTS = 5;
+/** 每升幾級可以多買一塊田 */
+export const PLOT_LEVEL_STEP = 5;
+/** 田地數量上限 = 5 初始 + 20 購買 = 25 塊。對應 Lv5..Lv100,每 5 級一塊。 */
+export const MAX_PLOTS = INITIAL_PLOTS + 20;
+
+/**
+ * 每個 tier(T1=Lv1-10 ... T10=Lv91-100)購買 1 塊新田的金幣價格。
+ * 每個 tier 涵蓋 2 塊田(例:T1 → Lv5、Lv10;T10 → Lv95、Lv100)。
+ * 調整數字直接改這個陣列。
+ */
+export const PLOT_COSTS_BY_TIER: readonly number[] = [
+  5_000,      // T1
+  12_000,     // T2
+  30_000,     // T3
+  70_000,     // T4
+  150_000,    // T5
+  350_000,    // T6
+  750_000,    // T7
+  1_500_000,  // T8
+  3_000_000,  // T9
+  6_000_000,  // T10
+];
+
+/** 第 N 塊購買田地(N=1 對應第 6 塊)所需的玩家等級 */
+export function plotRequiredLevel(purchaseIndex: number): number {
+  return purchaseIndex * PLOT_LEVEL_STEP; // 1→5, 2→10, ..., 20→100
+}
+
+/** 第 N 塊購買田地的金幣價格(依據要求等級落在哪個 tier) */
+export function plotPrice(purchaseIndex: number): number {
+  const lvl = plotRequiredLevel(purchaseIndex);
+  const tier = Math.min(PLOT_COSTS_BY_TIER.length, Math.max(1, Math.ceil(lvl / 10)));
+  return PLOT_COSTS_BY_TIER[tier - 1]!;
+}
+
+export type PlotLockedReason = 'cap' | 'level' | 'gold';
+
+export interface NextPlotInfo {
+  /** 已購買的田地數(plotCount - INITIAL_PLOTS) */
+  purchasesMade: number;
+  /** 下一塊要買的編號(1-based)。null = 已達上限 */
+  nextIndex: number | null;
+  /** 下一塊在田地中的編號(=plotCount + 1)。null = 已達上限 */
+  newPlotNumber: number | null;
+  /** 下一塊要求的角色等級 */
+  requiredLevel: number;
+  /** 下一塊的金幣價格 */
+  price: number;
+  /** 為什麼還不能買 */
+  lockedReason?: PlotLockedReason;
+}
+
+/** 純運算:給角色等級、金幣、目前田數,回傳「下一塊田」可否購買 + 條件 */
+export function nextPlotInfo(charLevel: number, gold: number, plotCount: number): NextPlotInfo {
+  const purchasesMade = Math.max(0, plotCount - INITIAL_PLOTS);
+  if (plotCount >= MAX_PLOTS) {
+    return {
+      purchasesMade,
+      nextIndex: null,
+      newPlotNumber: null,
+      requiredLevel: 0,
+      price: 0,
+      lockedReason: 'cap',
+    };
+  }
+  const nextIndex = purchasesMade + 1;
+  const requiredLevel = plotRequiredLevel(nextIndex);
+  const price = plotPrice(nextIndex);
+  let lockedReason: PlotLockedReason | undefined;
+  if (charLevel < requiredLevel) lockedReason = 'level';
+  else if (gold < price) lockedReason = 'gold';
+  return {
+    purchasesMade,
+    nextIndex,
+    newPlotNumber: plotCount + 1,
+    requiredLevel,
+    price,
+    lockedReason,
+  };
+}
+
+export type BuyPlotResult =
+  | { ok: true; newPlotCount: number; goldAfter: number; price: number }
+  | { ok: false; reason: string };
+
+/**
+ * 購買下一塊田地。整個檢查 + 扣錢 + 加田在同一個 transaction 裡,
+ * 避免雙擊 / 並發造成「超扣 / 超買」。
+ */
+export async function buyPlot(userId: string): Promise<BuyPlotResult> {
+  return prisma.$transaction(async (tx) => {
+    const character = await tx.character.findUnique({ where: { userId } });
+    if (!character) return { ok: false as const, reason: '你還沒建立角色,先用 `/start`' };
+    const farm = await tx.farm.findUnique({ where: { userId } });
+    if (!farm) return { ok: false as const, reason: '找不到你的農場' };
+    if (farm.plotCount >= MAX_PLOTS) {
+      return { ok: false as const, reason: `田地已達上限(${MAX_PLOTS} 塊)` };
+    }
+    const info = nextPlotInfo(character.level, character.gold, farm.plotCount);
+    if (info.lockedReason === 'level') {
+      return {
+        ok: false as const,
+        reason: `需要角色 Lv ${info.requiredLevel}(你 Lv ${character.level})`,
+      };
+    }
+    if (info.lockedReason === 'gold') {
+      return {
+        ok: false as const,
+        reason: `金幣不足:需要 ${info.price.toLocaleString()}💰(你 ${character.gold.toLocaleString()}💰)`,
+      };
+    }
+    const newCharacter = await tx.character.update({
+      where: { userId },
+      data: { gold: { decrement: info.price } },
+    });
+    const newFarm = await tx.farm.update({
+      where: { userId },
+      data: { plotCount: { increment: 1 } },
+    });
+    return {
+      ok: true as const,
+      newPlotCount: newFarm.plotCount,
+      goldAfter: newCharacter.gold,
+      price: info.price,
+    };
+  });
+}

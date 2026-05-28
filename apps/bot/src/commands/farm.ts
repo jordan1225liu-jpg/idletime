@@ -11,7 +11,16 @@ import {
   type StringSelectMenuInteraction,
 } from 'discord.js';
 import { settleEnergy } from '../lib/energy.js';
-import { getFarmState, plantCropAll, harvestAll, clearFarm, getFarmingSkill } from '../lib/farm.js';
+import {
+  getFarmState,
+  plantCropAll,
+  harvestAll,
+  clearFarm,
+  getFarmingSkill,
+  buyPlot,
+  nextPlotInfo,
+  MAX_PLOTS,
+} from '../lib/farm.js';
 import { buildFarmEmbed } from '../lib/embeds.js';
 import { unlockedCrops } from '../lib/crops.js';
 import { assetUrl } from '../lib/assets.js';
@@ -24,6 +33,7 @@ const SELECT_PLANT = 'farm:plant-select';
 const BUTTON_HARVEST = 'farm:harvest';
 const BUTTON_CLEAR = 'farm:clear';
 const BUTTON_REFRESH = 'farm:refresh';
+const BUTTON_BUY_PLOT = 'farm:buy-plot';
 const FARM_PREFIX = 'farm:';
 
 function formatDurationShort(seconds: number): string {
@@ -55,6 +65,25 @@ async function buildFarmUI(userId: string, notification?: string) {
   const hasEmpty = plots.some((p) => p.status === 'empty');
   const hasReady = plots.some((p) => p.status === 'ready');
   const hasGrowing = plots.some((p) => p.status === 'growing');
+
+  // 擴充田地狀態
+  const plotInfo = nextPlotInfo(character.level, character.gold, plots.length);
+  let plotFieldValue: string;
+  if (plotInfo.lockedReason === 'cap') {
+    plotFieldValue = `✨ 田地已開到上限(${MAX_PLOTS} 塊)`;
+  } else if (plotInfo.lockedReason === 'level') {
+    plotFieldValue = `第 ${plotInfo.newPlotNumber} 塊田・需要角色 **Lv ${plotInfo.requiredLevel}**(你 Lv ${character.level})🔒`;
+  } else if (plotInfo.lockedReason === 'gold') {
+    const diff = plotInfo.price - character.gold;
+    plotFieldValue = `第 ${plotInfo.newPlotNumber} 塊田・**${plotInfo.price.toLocaleString()}**💰(還差 ${diff.toLocaleString()}💰)`;
+  } else {
+    plotFieldValue = `第 ${plotInfo.newPlotNumber} 塊田・**${plotInfo.price.toLocaleString()}**💰 — 點下方「購買」`;
+  }
+  embed.addFields({
+    name: `🛒 擴充田地 (${plots.length}/${MAX_PLOTS})`,
+    value: plotFieldValue,
+    inline: false,
+  });
 
   // ─── Plant select menu ──────────────────────────────────────
   const unlocked = unlockedCrops(farmingSkill.level);
@@ -89,7 +118,7 @@ async function buildFarmUI(userId: string, notification?: string) {
   const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
 
   // ─── Action buttons ─────────────────────────────────────────
-  const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+  const buttons: ButtonBuilder[] = [
     new ButtonBuilder()
       .setCustomId(BUTTON_HARVEST)
       .setLabel('收成全部')
@@ -107,7 +136,34 @@ async function buildFarmUI(userId: string, notification?: string) {
       .setLabel('刷新')
       .setEmoji('🔄')
       .setStyle(ButtonStyle.Secondary),
-  );
+  ];
+
+  // 還能買田地時加上「購買」按鈕(條件不夠就 disabled 顯示卡在哪)
+  if (plotInfo.nextIndex !== null) {
+    let label: string;
+    let emoji: string;
+    if (plotInfo.lockedReason === 'level') {
+      label = `需 Lv ${plotInfo.requiredLevel}`;
+      emoji = '🔒';
+    } else if (plotInfo.lockedReason === 'gold') {
+      const diff = plotInfo.price - character.gold;
+      label = `差 ${diff.toLocaleString()}💰`;
+      emoji = '🔒';
+    } else {
+      label = `買田地 (${plotInfo.price.toLocaleString()}💰)`;
+      emoji = '🛒';
+    }
+    buttons.push(
+      new ButtonBuilder()
+        .setCustomId(BUTTON_BUY_PLOT)
+        .setLabel(label)
+        .setEmoji(emoji)
+        .setStyle(plotInfo.lockedReason ? ButtonStyle.Secondary : ButtonStyle.Success)
+        .setDisabled(plotInfo.lockedReason !== undefined),
+    );
+  }
+
+  const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons);
 
   return { embed, components: [selectRow, buttonRow] };
 }
@@ -165,6 +221,16 @@ export async function handleButton(interaction: ButtonInteraction): Promise<bool
 
   if (interaction.customId === BUTTON_REFRESH) {
     const ui = await buildFarmUI(userId);
+    if (ui) await interaction.editReply({ embeds: [ui.embed], components: ui.components });
+    return true;
+  }
+
+  if (interaction.customId === BUTTON_BUY_PLOT) {
+    const result = await buyPlot(userId);
+    const notification = result.ok
+      ? `🛒 已購買新田地!現在共 **${result.newPlotCount}/${MAX_PLOTS}** 塊田・花費 ${result.price.toLocaleString()}💰・剩餘 ${result.goldAfter.toLocaleString()}💰`
+      : `⚠️ ${result.reason}`;
+    const ui = await buildFarmUI(userId, notification);
     if (ui) await interaction.editReply({ embeds: [ui.embed], components: ui.components });
     return true;
   }
