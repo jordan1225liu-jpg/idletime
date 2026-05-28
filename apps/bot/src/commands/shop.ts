@@ -17,6 +17,7 @@ import {
   type EquipSlot,
 } from '../lib/equipment.js';
 import { COLORS } from '../lib/embeds.js';
+import { assetUrl } from '../lib/assets.js';
 
 export const data = new SlashCommandBuilder()
   .setName('shop')
@@ -41,6 +42,11 @@ async function buildShopUI(userId: string, notification?: string) {
       `💰 你的金幣:**${character.gold.toLocaleString()}**` +
         (notification ? `\n\n${notification}` : ''),
     );
+  // 鐵匠鋪場景圖 + 鐵匠博林肖像
+  const banner = assetUrl('activities/shop');
+  if (banner) embed.setImage(banner);
+  const npcImg = assetUrl('npcs/borin');
+  if (npcImg) embed.setThumbnail(npcImg);
 
   const rows: ActionRowBuilder<StringSelectMenuBuilder>[] = [];
 

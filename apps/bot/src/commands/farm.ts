@@ -14,6 +14,7 @@ import { settleEnergy } from '../lib/energy.js';
 import { getFarmState, plantCropAll, harvestAll, clearFarm, getFarmingSkill } from '../lib/farm.js';
 import { buildFarmEmbed } from '../lib/embeds.js';
 import { unlockedCrops } from '../lib/crops.js';
+import { assetUrl } from '../lib/assets.js';
 
 export const data = new SlashCommandBuilder()
   .setName('farm')
@@ -45,6 +46,11 @@ async function buildFarmUI(userId: string, notification?: string) {
   ]);
 
   const embed = buildFarmEmbed({ character, farmingSkill, plots, notification });
+  // 場景圖 + 老農湯姆肖像
+  const banner = assetUrl('activities/farm');
+  if (banner) embed.setImage(banner);
+  const npcImg = assetUrl('npcs/tom');
+  if (npcImg) embed.setThumbnail(npcImg);
 
   const hasEmpty = plots.some((p) => p.status === 'empty');
   const hasReady = plots.some((p) => p.status === 'ready');

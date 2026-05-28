@@ -13,6 +13,7 @@ import {
 import { castFish, type CastResult } from '../lib/fishing.js';
 import { expForNextLevel } from '../lib/leveling.js';
 import { COLORS, makeProgressBar } from '../lib/embeds.js';
+import { assetUrl } from '../lib/assets.js';
 
 export const data = new SlashCommandBuilder()
   .setName('fish')
@@ -92,6 +93,15 @@ function buildEmbed(result: CastResult): EmbedBuilder {
     .setFooter({ text: '1 分鐘後可再釣' });
 }
 
+/** 加上釣魚場景圖 + 漁婦瑪琳娜肖像(有圖才顯示,沒圖照舊) */
+function withSceneArt(embed: EmbedBuilder): EmbedBuilder {
+  const banner = assetUrl('activities/fish');
+  if (banner) embed.setImage(banner);
+  const npc = assetUrl('npcs/marina');
+  if (npc) embed.setThumbnail(npc);
+  return embed;
+}
+
 function buildButtons(): ActionRowBuilder<ButtonBuilder> {
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
@@ -115,7 +125,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   }
 
   await interaction.reply({
-    embeds: [buildEmbed(result)],
+    embeds: [withSceneArt(buildEmbed(result))],
     components: [buildButtons()],
   });
 }
@@ -126,7 +136,7 @@ export async function handleButton(interaction: ButtonInteraction): Promise<bool
   const result = await castFish(interaction.user.id);
 
   await interaction.update({
-    embeds: [buildEmbed(result)],
+    embeds: [withSceneArt(buildEmbed(result))],
     components: [buildButtons()],
   } satisfies InteractionEditReplyOptions);
 

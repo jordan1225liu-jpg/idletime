@@ -11,6 +11,7 @@ import {
 import { prisma } from '@idletime/db';
 import { POTIONS, brewPotion, maxBrewable } from '../lib/potions.js';
 import { COLORS } from '../lib/embeds.js';
+import { assetUrl } from '../lib/assets.js';
 
 export const data = new SlashCommandBuilder()
   .setName('brew')
@@ -45,6 +46,11 @@ async function buildBrewUI(userId: string, quantity: number, notification?: stri
       `💰 你的金幣:**${character.gold.toLocaleString()}**` +
         (notification ? `\n\n${notification}` : ''),
     );
+  // 工坊場景圖 + 藥師賽吉肖像
+  const banner = assetUrl('activities/brew');
+  if (banner) embed.setImage(banner);
+  const npcImg = assetUrl('npcs/sage');
+  if (npcImg) embed.setThumbnail(npcImg);
 
   const craftable: string[] = [];
 

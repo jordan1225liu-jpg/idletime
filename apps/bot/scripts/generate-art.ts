@@ -129,6 +129,39 @@ const SPECS: Spec[] = [
       'a celestial divine realm above the clouds, floating islands, radiant golden light, marble temple, ' +
       'heavenly ethereal atmosphere',
   },
+  // ─── Phase 2 — 生活活動場景橫幅 ───────────────────────────────
+  {
+    path: 'activities/farm',
+    ...BANNER,
+    seed: 401,
+    prompt:
+      'a cozy medieval farm in golden autumn, neat tilled rows of crops growing, a small wooden barn, ' +
+      'split-rail fence, scarecrow, gentle rolling hills, warm sunlight',
+  },
+  {
+    path: 'activities/fish',
+    ...BANNER,
+    seed: 402,
+    prompt:
+      'a peaceful medieval river bank with a wooden fishing dock, fishing rods leaning, lily pads, ' +
+      'reeds, a small rowboat, sunset reflections',
+  },
+  {
+    path: 'activities/brew',
+    ...BANNER,
+    seed: 403,
+    prompt:
+      "a cozy medieval alchemist's workshop interior, bubbling green cauldron, glass vials with colored potions, " +
+      'shelves stuffed with herbs and roots, soft magical glow, warm candlelight',
+  },
+  {
+    path: 'activities/shop',
+    ...BANNER,
+    seed: 404,
+    prompt:
+      "a cozy medieval blacksmith's shop interior, glowing red forge, anvil with a hammer, " +
+      'walls hung with swords shields and armor, sparks, warm orange light',
+  },
 ];
 
 const args = process.argv.slice(2);
